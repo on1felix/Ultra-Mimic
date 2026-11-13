@@ -1,0 +1,36 @@
+[package]
+name = "ultra-mimic"
+version = "2.0.0"
+description = "Ultra Mimic — Discord activity emulator"
+authors = ["Ultra Mimic"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "ultra_mimic_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-single-instance = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip"] }
+tokio = { version = "1", features = ["full"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_Security",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging"
+] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

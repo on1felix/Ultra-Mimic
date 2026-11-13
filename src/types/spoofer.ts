@@ -1,0 +1,151 @@
+export type SpooferStatus = 'idle' | 'running' | 'paused' | 'finished' | 'error';
+
+export type SpoofMode = 'hybrid' | 'process_only' | 'rpc_only';
+
+export type SpoofMethod = 'process' | 'rpc';
+
+export interface ActiveGame {
+  id: string;
+  name: string;
+  executable?: string;
+  pid?: number;
+  icon_hash?: string;
+  method: 'process' | 'rpc';
+}
+
+/** Game queued for the next batch (drives the "up next" panel). */
+export interface NextGame {
+  id: string;
+  name: string;
+  icon_hash?: string;
+  method: 'process' | 'rpc';
+  executable?: string;
+}
+
+export interface SpoofableGameItem {
+  id: string;
+  name: string;
+  rel_path?: string | null;
+  arguments?: string | null;
+  icon_hash?: string;
+  method: 'process' | 'rpc';
+  /** 18+ game (Discord "Erotic" theme or ESRB Adults Only). */
+  adult?: boolean;
+}
+
+export interface SpooferTickEvent {
+  current_index: number;
+  total_games: number;
+  active_batch: ActiveGame[];
+  elapsed_secs: number;
+  estimated_remaining_secs: number;
+  games_per_minute: number;
+  /** Games that launched in this run. */
+  succeeded_count?: number;
+  /** Games that failed to launch in this run. */
+  failed_count?: number;
+  /** "hold" | "farm" | "cooldown" | "idle" */
+  phase?: 'hold' | 'farm' | 'cooldown' | 'idle';
+  hold_total_secs?: number;
+  hold_remaining_secs?: number;
+  cooldown_remaining_secs?: number;
+  next_batch?: NextGame[];
+  pool_remaining?: number;
+}
+
+export interface SpooferLogEvent {
+  id: string;
+  timestamp: string;
+  level: 'info' | 'success' | 'warn' | 'error';
+  message: string;
+}
+
+export interface SpooferStatusEvent {
+  status: SpooferStatus;
+  message?: string;
+}
+
+export interface FetchProgressEvent {
+  total_fetched: number;
+  process_count: number;
+  rpc_count: number;
+  history_process_count?: number;
+  history_rpc_count?: number;
+  is_loading: boolean;
+}
+
+export interface FetchGamesResponse {
+  total: number;
+  process_count: number;
+  rpc_count: number;
+  history_process_count?: number;
+  history_rpc_count?: number;
+  /** True when the games came from the saved copy instead of the Discord API. */
+  from_cache?: boolean;
+}
+
+export interface SpooferStateResponse {
+  status: SpooferStatus;
+  total_count: number;
+  process_count: number;
+  rpc_count: number;
+  history_count: number;
+  history_process_count?: number;
+  history_rpc_count?: number;
+}
+
+export interface SpooferConfig {
+  limit?: number | null;
+  batch_size: number;
+  hold_duration_secs: number;
+  start_offset?: number;
+  skip_previously_spoofed?: boolean;
+  spoof_mode: SpoofMode;
+  /** Opt-in beta: allows non-native categories (RPC / console / SDK) to be selected. */
+  beta_enabled?: boolean;
+  cooldown_enabled: boolean;
+  cooldown_every_n_batches: number;
+  cooldown_seconds: number;
+  jitter_enabled: boolean;
+  /** Farm mode: exactly these games run as one fixed batch, without rotation. */
+  farm_game_ids?: string[];
+  /** Farm time limit; null keeps the games running until stopped. */
+  farm_duration_secs?: number | null;
+  /** Leave out 18+ games. */
+  exclude_adult?: boolean;
+}
+
+/** One custom Discord status that stays until it is stopped. */
+export interface FakeStatusConfig {
+  /** Discord application ID of the game the status is shown for. */
+  game_id: string;
+  /** Replaces the game's name in the status. */
+  name?: string | null;
+  details?: string | null;
+  state?: string | null;
+  /** Direct https link to a picture. */
+  image_url?: string | null;
+  /** 0 playing, 2 listening, 3 watching, 5 competing. */
+  activity_type?: number;
+}
+
+/** Row of the "already farmed" list. */
+export interface HistoryGame {
+  id: string;
+  name: string;
+  icon_hash?: string;
+  executable?: string | null;
+  method: 'process' | 'rpc';
+  adult: boolean;
+  /** False when the id is not present in the local game database. */
+  known: boolean;
+}
+
+/** Footprint of the single app data folder. */
+export interface StorageInfo {
+  data_dir: string;
+  total_bytes: number;
+  cache_bytes: number;
+  history_bytes: number;
+  webview_bytes: number;
+}

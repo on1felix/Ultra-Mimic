@@ -1,0 +1,47 @@
+Ultra Mimic — резервная копия исходников
+========================================
+
+Дата бэкапа : 14.11.2026
+Источник    : F:\mimic 2.0
+Назначение  : только исходный код, без сборочных артефактов
+
+Что внутри
+----------
+- src\                 фронтенд (React + TypeScript)
+- src-tauri\src\       бэкенд (Rust)
+- src-tauri\icons\     иконки приложения (ico / png / icns)
+- src-tauri\capabilities\, dummy_src\, build.rs, Cargo.toml, Cargo.lock, tauri.conf.json
+- public\logo.png      логотип в интерфейсе
+- конфиги: package.json, package-lock.json, tsconfig*.json, vite.config.ts,
+  tailwind.config.ts, postcss.config.js, index.html, .gitignore
+- скрипты: build.bat (сборка релиза), dev.bat (режим разработки)
+- документация: README.md, README.en.md, LICENSE, proof.png
+- .github\workflows\build.yml
+
+Что НЕ включено (восстанавливается командами)
+---------------------------------------------
+- node_modules\        npm install
+- dist\               npm run build
+- src-tauri\target\   cargo / tauri build
+- src-tauri\gen\      генерируется автоматически
+- mimic.png, public\mimic.png  (не используются)
+
+Как собрать
+-----------
+Из корня папки (двойной клик или из консоли):
+
+    build.bat
+
+Скрипт сам подставит Rust-тулчейн и окружение MSVC, соберёт фронтенд и Rust,
+положит готовый exe и напечатает размер с SHA256.
+
+Готовый файл: src-tauri\target\release\Ultra Mimic.exe
+
+Режим разработки:
+
+    dev.bat
+
+Контрольная сумма exe на момент бэкапа
+-------------------------------------
+SHA256 : 40A722E711B71999ECA29FD94000EAC90109DF9F988F3327905B952318D33DE4
+Размер : 15 491 584 байт
