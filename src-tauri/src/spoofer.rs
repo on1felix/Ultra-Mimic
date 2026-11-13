@@ -23,6 +23,47 @@ static DUMMY_EXE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy"
 
 const MAX_FARM_GAMES: usize = 20;
 
+/// Random hold bonus (4–10 s). Real randomness instead of a cycling 1–3
+/// pattern: the system clock is mixed with a splitmix-style hash.
+fn jitter_seconds() -> u64 {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0);
+    let mut x = nanos ^ (nanos >> 33);
+    x = x.wrapping_mul(0xff51_afd7_ed55_8ccd);
+    x ^= x >> 33;
+    4 + x % 7
+}
+
+/// Pause that follows a batch (0 when the cooldown manager is off).
+fn cooldown_pause_secs(config: &SpooferConfig) -> u64 {
+    if config.cooldown_enabled {
+        let every = config.cooldown_every_n_batches.max(1) as u64;
+        config.cooldown_seconds / every
+    } else {
+        0
+    }
+}
+
+/// Average game length: the hold plus the average jitter.
+fn average_hold_secs(config: &SpooferConfig) -> u64 {
+    config.hold_duration_secs + if config.jitter_enabled { 7 } else { 0 }
+}
+
+/// Expected session length: every game at its average hold plus the pauses
+/// between batches. Subtracting the elapsed time gives an ETA that falls
+/// smoothly through hold, cooldown and batch switches alike, instead of being
+/// recomputed from a noisy games-per-second rate.
+fn session_estimate_secs(config: &SpooferConfig, games: usize, batch_size: usize) -> u64 {
+    if games == 0 {
+        return 0;
+    }
+    let batch = batch_size.max(1) as u64;
+    let batches = (games as u64 + batch - 1) / batch;
+    batches * average_hold_secs(config) + batches.saturating_sub(1) * cooldown_pause_secs(config)
+}
+
 /// Compact description of the upcoming batch, used by the UI countdown panel.
 fn preview_games(pool: &[SpoofableGame], count: usize) -> Vec<NextGamePreview> {
     pool.iter()
@@ -456,7 +497,12 @@ pub async fn run_spoofer(
                             total_games: target_count,
                             active_batch: Vec::new(),
                             elapsed_secs: start_time.elapsed().as_secs(),
-                            estimated_remaining_secs: left,
+                            estimated_remaining_secs: session_estimate_secs(
+                                &config,
+                                target_count,
+                                batch_size,
+                            )
+                            .saturating_sub(start_time.elapsed().as_secs()),
                             games_per_minute: 0.0,
                             succeeded_count,
                             failed_count,
@@ -695,8 +741,7 @@ pub async fn run_spoofer(
 
         // Calculate holding duration with optional organic jitter
         let hold_secs = if config.jitter_enabled {
-            let jitter = (batch_counter % 3) as u64 + 1;
-            config.hold_duration_secs + jitter
+            config.hold_duration_secs + jitter_seconds()
         } else {
             config.hold_duration_secs
         };
@@ -714,11 +759,11 @@ pub async fn run_spoofer(
         } else {
             0.0
         };
-        let remaining_games = target_count.saturating_sub(games_done);
-        let estimated_remaining_secs = if games_per_sec > 0.0 {
-            (remaining_games as f64 / games_per_sec) as u64
+        let estimated_remaining_secs = if is_farm {
+            hold_duration.map(|d| d.as_secs()).unwrap_or(0)
         } else {
-            (remaining_games as u64 / batch_size as u64) * config.hold_duration_secs
+            session_estimate_secs(&config, target_count, batch_size)
+                .saturating_sub(start_time.elapsed().as_secs())
         };
 
         let hold_total_secs = hold_duration.map(|d| d.as_secs()).unwrap_or(0);
@@ -814,7 +859,12 @@ pub async fn run_spoofer(
                         total_games: target_count,
                         active_batch: active_batch_info.clone(),
                         elapsed_secs: held.as_secs(),
-                        estimated_remaining_secs: left,
+                        estimated_remaining_secs: if is_farm {
+                            left
+                        } else {
+                            session_estimate_secs(&config, target_count, batch_size)
+                                .saturating_sub(start_time.elapsed().as_secs())
+                        },
                         games_per_minute: 0.0,
                         succeeded_count,
                         failed_count,
@@ -918,17 +968,11 @@ pub async fn run_spoofer(
         } else {
             0.0
         };
-        let remaining_games = target_count.saturating_sub(games_done);
-        let fallback_secs = if batch_size > 0 {
-            let batches_left = (remaining_games + batch_size - 1) / batch_size;
-            batches_left as u64 * config.hold_duration_secs
-        } else {
+        let estimated_remaining_secs = if is_farm {
             0
-        };
-        let estimated_remaining_secs = if games_per_sec > 0.0 {
-            (remaining_games as f64 / games_per_sec) as u64
         } else {
-            fallback_secs
+            session_estimate_secs(&config, target_count, batch_size)
+                .saturating_sub(start_time.elapsed().as_secs())
         };
 
         let _ = app.emit(

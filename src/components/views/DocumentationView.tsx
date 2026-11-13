@@ -55,7 +55,7 @@ const RU: Copy = {
     'Локальный клиент для эмуляции игровой активности Discord. Запускает игры из базы, держит их нужное время и ведёт историю — без RPC, телеметрии и лишних настроек.',
   chips: ['process-only', 'локально', 'без телеметрии', 'история'],
   howTitle: 'Как это работает',
-  howHint: 'Один цикл занимает несколько минут: игра → удержание → пауза 15 секунд → следующая игра.',
+  howHint: 'Один цикл занимает несколько минут: игра → удержание → пауза 20 секунд → следующая игра.',
   steps: [
     {
       title: 'Discord видит процесс',
@@ -67,7 +67,7 @@ const RU: Copy = {
     },
     {
       title: 'Смена игры',
-      text: 'Процесс закрывается, выдерживается пауза 15 секунд, затем запускается следующая игра. Уже прогнанные игры пропускаются, поэтому повторов нет.',
+      text: 'Процесс закрывается, выдерживается пауза 20 секунд, затем запускается следующая игра. Уже прогнанные игры пропускаются, поэтому повторов нет.',
     },
     {
       title: 'История',
@@ -81,7 +81,7 @@ const RU: Copy = {
     { label: 'Игр за сессию', value: '100' },
     { label: 'Удержание', value: '3 мин' },
     { label: 'Поток', value: '1' },
-    { label: 'Пауза после игры', value: '15 сек' },
+    { label: 'Пауза после игры', value: '20 сек' },
   ],
   sectionsTitle: 'Разделы приложения',
   sectionsHint: 'Что делает каждая вкладка и когда её открывать.',
@@ -94,7 +94,7 @@ const RU: Copy = {
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Фарм игр',
-      text: 'Основной режим. Настройте удержание, размер партии, лимит игр и фильтры: пропуск прогнанных, 18+ и джиттер. Пауза 15 секунд после каждой игры встроена и учитывается в оценке времени.',
+      text: 'Основной режим. Настройте удержание, размер партии, лимит игр и фильтры: пропуск прогнанных, 18+ и джиттер. Пауза 20 секунд после каждой игры встроена и учитывается в оценке времени.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
@@ -104,7 +104,7 @@ const RU: Copy = {
     {
       icon: <History className="h-4 w-4" />,
       name: 'История',
-      text: 'Список всех прогнанных игр. Отсюда можно вернуть игру в пул, экспортировать историю в JSON или очистить её.',
+      text: 'Список всех прогнанных игр. Отсюда можно вернуть игру в пул или полностью очистить историю.',
     },
     {
       icon: <Database className="h-4 w-4" />,
@@ -126,8 +126,8 @@ const RU: Copy = {
   under: [
     'Режим process-only: эмулируется только запуск .exe. RPC- и консольные режимы удалены, чтобы поведение было предсказуемым.',
     'Партии: игры запускаются группами. Размер партии задаётся в «Фарме игр», по умолчанию 1 игра — так активность выглядит естественнее.',
-    'После каждой игры процесс закрывается, выдерживается пауза 15 секунд, и только потом стартует следующая игра. Эта пауза всегда включена и входит в общую оценку времени.',
-    'Джиттер добавляет несколько секунд к удержанию, чтобы интервалы не были одинаковыми.',
+    'После каждой игры процесс закрывается, выдерживается пауза 20 секунд, и только потом стартует следующая игра. Эта пауза всегда включена и входит в общую оценку времени.',
+    'Джиттер добавляет случайные 4–10 секунд к удержанию, чтобы интервалы не были одинаковыми.',
     'База Discord кэшируется локально и обновляется по кнопке. История и кэш лежат в %APPDATA%\\Ultra Mimic.',
     'Все данные остаются на компьютере: приложение не отправляет статистику и не требует аккаунта.',
   ],
@@ -149,7 +149,7 @@ const EN: Copy = {
     'A local client for emulating Discord game activity. It launches games from the database, holds them for the right time and keeps a history — no RPC, no telemetry, no clutter.',
   chips: ['process-only', 'local', 'no telemetry', 'history'],
   howTitle: 'How it works',
-  howHint: 'One cycle takes a few minutes: launch → hold → 15 s pause → next game.',
+  howHint: 'One cycle takes a few minutes: launch → hold → 20 s pause → next game.',
   steps: [
     {
       title: 'Discord sees the process',
@@ -161,7 +161,7 @@ const EN: Copy = {
     },
     {
       title: 'Switch game',
-      text: 'The process closes, a 15 second pause follows, then the next game starts. Games already in history are skipped, so nothing repeats.',
+      text: 'The process closes, a 20 second pause follows, then the next game starts. Games already in history are skipped, so nothing repeats.',
     },
     {
       title: 'History',
@@ -175,7 +175,7 @@ const EN: Copy = {
     { label: 'Games per session', value: '100' },
     { label: 'Hold', value: '3 min' },
     { label: 'Stream', value: '1' },
-    { label: 'Pause after game', value: '15 s' },
+    { label: 'Pause after game', value: '20 s' },
   ],
   sectionsTitle: 'App sections',
   sectionsHint: 'What each tab does and when to open it.',
@@ -188,7 +188,7 @@ const EN: Copy = {
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Game farm',
-      text: 'The main mode. Set hold, batch size, game limit and filters: skip played, 18+ and jitter. A 15 second pause after every game is built in and included in the time estimate.',
+      text: 'The main mode. Set hold, batch size, game limit and filters: skip played, 18+ and jitter. A 20 second pause after every game is built in and included in the time estimate.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
@@ -198,7 +198,7 @@ const EN: Copy = {
     {
       icon: <History className="h-4 w-4" />,
       name: 'History',
-      text: 'Every farmed game. Return a game to the pool, export history as JSON or clear it.',
+      text: 'Every farmed game. Return a game to the pool or clear the whole history.',
     },
     {
       icon: <Database className="h-4 w-4" />,
@@ -220,8 +220,8 @@ const EN: Copy = {
   under: [
     'Process-only mode: only the .exe launch is emulated. RPC and console modes were removed to keep behaviour predictable.',
     'Batches: games launch in groups. Batch size is configured in Game farm; the default of 1 game looks more natural.',
-    'After every game the process closes, a 15 second pause follows, and only then the next game starts. The pause is always on and is included in the total estimate.',
-    'Jitter adds a few seconds to the hold so intervals are not identical.',
+    'After every game the process closes, a 20 second pause follows, and only then the next game starts. The pause is always on and is included in the total estimate.',
+    'Jitter adds a random 4–10 seconds to the hold so intervals are not identical.',
     'The Discord database is cached locally and refreshed on demand. History and cache live in %APPDATA%\\Ultra Mimic.',
     'Everything stays on your PC: no statistics are sent and no account is required.',
   ],

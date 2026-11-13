@@ -40,9 +40,11 @@ export const Progress: React.FC<ProgressProps> = ({
       aria-valuemin={0}
       aria-valuemax={100}
     >
+      {/* Linear 1 s = the tick interval: the bar glides at one constant speed
+          between updates instead of easing in and out on every tick. */}
       <div
         className={cn(
-          'h-full rounded-full transition-[width] duration-500 ease-out',
+          'h-full rounded-full transition-[width] duration-1000 ease-linear',
           tones[tone]
         )}
         style={{ width: `${pct}%` }}

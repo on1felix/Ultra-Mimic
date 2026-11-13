@@ -20,7 +20,7 @@ const CONFIG_KEY = 'ultra-mimic.config';
 const LEGACY_CONFIG_KEY = 'mimic2.config';
 const HOLD_MIGRATION_KEY = 'ultra-mimic.config.hold-3m';
 
-/** Defaults: 100 games, 1 stream, 3 min hold, built-in 15 s pause after each game. */
+/** Defaults: 100 games, 1 stream, 3 min hold, built-in 20 s pause after each game. */
 const DEFAULT_CONFIG: SpooferConfig = {
   limit: 100,
   batch_size: 1,
@@ -29,7 +29,7 @@ const DEFAULT_CONFIG: SpooferConfig = {
   spoof_mode: 'process_only',
   cooldown_enabled: true,
   cooldown_every_n_batches: 1,
-  cooldown_seconds: 15,
+  cooldown_seconds: 20,
   jitter_enabled: true,
   exclude_adult: true,
 };
@@ -56,12 +56,12 @@ function readConfig(): SpooferConfig {
     next = DEFAULT_CONFIG;
   }
 
-  // Built-in rhythm: a 15 s pause after every game, always on.
+  // Built-in rhythm: a 20 s pause after every game, always on.
   next = {
     ...next,
     cooldown_enabled: true,
     cooldown_every_n_batches: 1,
-    cooldown_seconds: 15,
+    cooldown_seconds: 20,
   };
 
   // Move the old 185 s default to the new 3 min default once.

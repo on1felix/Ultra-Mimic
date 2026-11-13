@@ -157,34 +157,78 @@ export function Segmented<T extends string | number>({
   className,
   size = 'md',
 }: SegmentedProps<T>) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const itemRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const activeIndex = options.findIndex((option) => option.value === value);
+
+  // The highlight is one element that slides between the options, so the
+  // selected cell is measured rather than redrawn on every change.
+  const [pill, setPill] = useState({ x: 0, y: 0, width: 0, height: 0, ready: false });
+
+  useEffect(() => {
+    const measure = () => {
+      const container = containerRef.current;
+      const item = itemRefs.current[activeIndex];
+      if (!container || !item) {
+        setPill((prev) => (prev.ready ? { ...prev, ready: false } : prev));
+        return;
+      }
+      setPill({
+        x: item.offsetLeft,
+        y: item.offsetTop,
+        width: item.offsetWidth,
+        height: item.offsetHeight,
+        ready: true,
+      });
+    };
+
+    measure();
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [activeIndex, options.length, size]);
+
   return (
     <div
+      ref={containerRef}
       className={cn(
-        'inline-flex w-full items-center gap-1 rounded-xl border border-border bg-surface-300/60 p-1',
+        'relative inline-flex w-full items-center gap-1 rounded-xl border border-border bg-surface-300/60 p-1',
         disabled && 'opacity-50',
         className
       )}
     >
-      {options.map((option) => {
+      {pill.ready && (
+        <motion.span
+          className="pointer-events-none absolute left-0 top-0 rounded-lg bg-accent/[0.16] ring-1 ring-inset ring-accent/30"
+          initial={false}
+          animate={{ x: pill.x, y: pill.y, width: pill.width, height: pill.height }}
+          transition={{ duration: 0.24, ease: [0.22, 1, 0.36, 1] }}
+          aria-hidden
+        />
+      )}
+
+      {options.map((option, index) => {
         const active = option.value === value;
         const isDisabled = disabled || option.disabled;
         return (
           <button
             key={String(option.value)}
+            ref={(node) => {
+              itemRefs.current[index] = node;
+            }}
             type="button"
             title={option.title}
             disabled={isDisabled}
             onClick={() => onChange(option.value)}
             className={cn(
-              'relative flex-1 rounded-lg px-2 text-center font-medium transition-[color,background-color,box-shadow,transform] duration-150 active:scale-[0.97]',
+              'relative flex-1 rounded-lg px-2 text-center font-medium transition-colors duration-150',
               size === 'sm' ? 'py-1 text-[11px]' : 'py-1.5 text-xs',
-              active
-                ? 'bg-accent/[0.16] text-white ring-1 ring-inset ring-accent/30'
-                : 'text-muted hover:text-foreground',
+              active ? 'text-white' : 'text-muted hover:text-foreground',
               isDisabled && 'cursor-not-allowed'
             )}
           >
-            <span className="relative whitespace-nowrap">{option.label}</span>
+            <span className="whitespace-nowrap">{option.label}</span>
           </button>
         );
       })}

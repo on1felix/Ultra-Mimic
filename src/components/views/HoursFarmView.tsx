@@ -6,6 +6,7 @@ import {
   Clock3,
   Gamepad2,
   History,
+  Infinity as InfinityIcon,
   Play,
   Plus,
   Search,
@@ -229,7 +230,13 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
               onChange={(value) => setDuration(value === 'inf' ? null : Number(value))}
               options={DURATIONS.map((item) => ({
                 value: item.value === null ? 'inf' : String(item.value),
-                label: u(item.key),
+                label:
+                  item.value === null ? (
+                    <InfinityIcon className="mx-auto h-3.5 w-3.5" strokeWidth={2.2} />
+                  ) : (
+                    u(item.key)
+                  ),
+                title: item.value === null ? u(item.key) : undefined,
               }))}
             />
             <p className="mt-1.5 text-[11px] text-faint">{u('hf.durationHint')}</p>

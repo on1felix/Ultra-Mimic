@@ -35,7 +35,7 @@ It works in **process-only** mode: only the process launch is emulated. RPC and 
 | Section | What it does |
 | --- | --- |
 | **Overview** | Live snapshot: current game timer, progress and the upcoming queue. During the built-in pause the ring drains backwards in amber. |
-| **Game farm** | The main mode. Hold, batch size, game limit, filters: skip played, 18+ and jitter. A 15 second pause after every game is built in. |
+| **Game farm** | The main mode. Hold, batch size, game limit, filters: skip played, 18+ and jitter. A 20 second pause after every game is built in. |
 | **Hour farm** | Up to 20 games held together for the chosen duration. Selection on the left, database search on the right. |
 | **History** | Every farmed game. Search, return a game to the pool, clear the history. |
 | **Game database** | Executable games Discord can detect. Search by name or path, farmed marks, cache refresh. |
@@ -47,7 +47,7 @@ It works in **process-only** mode: only the process launch is emulated. RPC and 
 
 1. **Discord sees the process.** Ultra Mimic takes a game from the Discord database and launches its `.exe` the same way a normal launch does.
 2. **Hold.** The game stays active for the configured time. The default is 3 minutes — enough for the activity to count.
-3. **Switch game.** The process closes, a 15 second pause follows, then the next game starts. Games already farmed are skipped.
+3. **Switch game.** The process closes, a 20 second pause follows, then the next game starts. Games already farmed are skipped.
 4. **History.** Every completed game goes to history right away and is never launched again.
 
 ## Quick start
@@ -66,7 +66,7 @@ A session can be finished at any time with the **Finish** button — the current
 | Games per session | 100 |
 | Hold | 3 minutes (from 15 seconds up to 1 hour, 30 second steps) |
 | Streams (games at once) | 1 |
-| Pause after a game | 15 seconds |
+| Pause after a game | 20 seconds |
 | Games in Hour farm | up to 20 |
 
 ## Screenshots

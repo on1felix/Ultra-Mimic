@@ -71,7 +71,8 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
   const estimate = useMemo(() => {
     const batchSize = Math.max(1, config.batch_size);
     const batches = Math.ceil(target / batchSize);
-    const hold = config.hold_duration_secs + (config.jitter_enabled ? 2 : 0);
+    // Jitter averages ~7 s (random 4–10 s), used as the estimate offset.
+    const hold = config.hold_duration_secs + (config.jitter_enabled ? 7 : 0);
     let seconds = batches * hold;
     if (config.cooldown_enabled && config.cooldown_every_n_batches > 0) {
       const pauses = Math.max(0, Math.ceil(batches / config.cooldown_every_n_batches) - 1);
@@ -309,7 +310,7 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
                 <Timer className="h-3.5 w-3.5" />
                 {u('gf.builtinPause')}
               </span>
-              <span className="num font-mono text-muted">15 s</span>
+              <span className="num font-mono text-muted">{config.cooldown_seconds} s</span>
             </div>
 
             {target === 0 && (

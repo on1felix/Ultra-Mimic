@@ -106,7 +106,7 @@ fn default_cooldown_batches() -> usize {
 }
 
 fn default_cooldown_seconds() -> u64 {
-    30
+    20
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
