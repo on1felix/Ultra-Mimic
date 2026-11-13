@@ -20,8 +20,6 @@ Launches games from the Discord database, holds them for the right time and keep
 
 ---
 
-<img src="docs/preview-overview.png" alt="Ultra Mimic overview" />
-
 ## About
 
 Ultra Mimic is a portable Windows app that plays Discord game activity: it picks a game from the official Discord database, launches its `.exe` and holds it for as long as needed. Discord shows “Playing …”, while the app keeps a local history and never launches the same game twice.
@@ -73,9 +71,14 @@ A session can be finished at any time with the **Finish** button — the current
 
 ## Screenshots
 
-<img src="docs/preview-hours.png" alt="Hour farm" />
+The main page — “Overview”: current game timer, progress and queue.
 
-<img src="proof.png" width="420" alt="Discord Universal badge" />
+<img src="docs/preview-overview.png" alt="Overview — main page" />
+
+<p align="center">
+  <img src="proof.png" width="420" alt="Discord Universal badge" /><br>
+  <sub>The Discord “Universal” badge after a session</sub>
+</p>
 
 ## Data and privacy
 
