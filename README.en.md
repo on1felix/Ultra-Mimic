@@ -35,7 +35,7 @@ It works in **process-only** mode: only the process launch is emulated. RPC and 
 | Section | What it does |
 | --- | --- |
 | **Overview** | Live snapshot: current game timer, progress and the next game. During the built-in pause the ring stays full in amber. |
-| **Game farm** | The main mode. Hold, game limit, filters: skip played, 18+ and jitter. A 20 second pause after every game is built in. |
+| **Game farm** | The main mode. Hold, game limit, filters: skip played and 18+. A 20 second pause after every game is built in. |
 | **Hour farm** | One selected game held for the chosen duration. Selection on the left, database search on the right. |
 | **History** | Every farmed game. Search, return a game to the pool, clear the history. |
 | **Game database** | Executable games Discord can detect. Search by name or path, farmed marks, cache refresh. |

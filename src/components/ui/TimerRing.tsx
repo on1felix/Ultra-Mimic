@@ -129,7 +129,36 @@ export const TimerRing: React.FC<TimerRingProps> = ({
     }
   }, [paused]);
 
-  // One animation frame at a time: the arc and the digits share one clock.
+  // Digits live on their own timer, not on an animation frame. Chromium throttles
+  // (or pauses) rAF when the window is occluded, minimized or the machine is
+  // busy, and one skipped frame used to swallow a whole second on screen. The
+  // interval keeps firing even when frames are throttled, and the guard turns a
+  // late update into two quick steps instead of one two-second jump.
+  useEffect(() => {
+    const tick = () => {
+      const a = anchor.current;
+      if (!a.primed) return;
+      const { hasWindow: bounded, elapsed: spent } = live.current;
+      const now = performance.now();
+      const raw = a.paused ? a.value : a.value - (now - a.at) / 1000;
+      let next = bounded ? Math.ceil(Math.max(0, raw)) : Math.max(0, Math.floor(spent));
+      // A late update must not skip a digit while a countdown is running. Only
+      // bounded windows are clamped: an idle or open-ended ring has to be free
+      // to jump (for example straight to 00:00 when a run is stopped).
+      if (bounded && next < clockRef.current - 1) {
+        next = clockRef.current - 1;
+      }
+      if (next !== clockRef.current) {
+        clockRef.current = next;
+        setClockSecs(next);
+      }
+    };
+    tick();
+    const id = window.setInterval(tick, 100);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // One animation frame at a time: the arc follows the same anchor.
   useEffect(() => {
     let raf = 0;
     const paint = (now: number) => {
@@ -137,21 +166,12 @@ export const TimerRing: React.FC<TimerRingProps> = ({
       const {
         total: window,
         hasWindow: bounded,
-        elapsed: spent,
         cooldown: isCooldown,
       } = live.current;
 
       if (a.primed) {
         const raw = a.paused ? a.value : a.value - (now - a.at) / 1000;
         const left = Math.max(0, raw);
-
-        // Digits: bounded windows count down with ceil (never skip a second),
-        // open-ended farm runs count up with floor.
-        const nextSecs = bounded ? Math.ceil(left) : Math.max(0, Math.floor(spent));
-        if (nextSecs !== clockRef.current) {
-          clockRef.current = nextSecs;
-          setClockSecs(nextSecs);
-        }
 
         // Arc: the hold fills from empty to full (like the original build).
         // The built-in cooldown keeps a calm, full amber ring: only the digits

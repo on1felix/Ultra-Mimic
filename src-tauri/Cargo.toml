@@ -3,7 +3,7 @@ name = "ultra-mimic"
 version = "2.0.0"
 description = "Ultra Mimic — Discord activity emulator"
 authors = ["Ultra Mimic"]
-license = "MIT"
+license = "GPL-3.0-or-later"
 edition = "2021"
 
 [lib]

@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
-  Activity,
   BookOpen,
   Clock3,
   Database,
@@ -9,7 +8,6 @@ import {
   LayoutDashboard,
   ListChecks,
   Smile,
-  RefreshCw,
   TerminalSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -51,18 +49,12 @@ const GROUP_TOOLS: NavItem[] = [
 interface SidebarProps {
   activeTab: Tab;
   onTabChange: (tab: Tab) => void;
-  discordRunning: boolean | null;
-  isCheckingDiscord: boolean;
-  onCheckDiscord: () => void;
   historyCount: number;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onTabChange,
-  discordRunning,
-  isCheckingDiscord,
-  onCheckDiscord,
   historyCount,
 }) => {
   const { u } = useUi();
@@ -124,31 +116,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {renderGroup('sidebar.dataGroup', GROUP_DATA)}
         {renderGroup('sidebar.toolsGroup', GROUP_TOOLS)}
       </nav>
-
-      {/* Discord state: click re-checks the client */}
-      <button
-        type="button"
-        onClick={onCheckDiscord}
-        title={u('s.check')}
-        className="mx-2.5 mb-2.5 flex items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.025] px-2.5 py-2 text-left transition-colors hover:border-white/[0.12] hover:bg-white/[0.045]"
-      >
-        <span
-          className={cn(
-            'h-2 w-2 flex-shrink-0 rounded-full',
-            discordRunning ? 'bg-mint' : discordRunning === null ? 'bg-amber' : 'bg-rose'
-          )}
-        />
-        <div className="min-w-0">
-          <p className="truncate text-[11px] font-medium text-foreground/85">
-            {discordRunning === null ? u('top.discordChecking') : discordRunning ? u('top.discordOn') : u('top.discordOff')}
-          </p>
-          <p className="truncate text-[10px] text-faint">
-            {discordRunning ? u('sb.tracking') : u('sb.launch')}
-          </p>
-        </div>
-        <Activity className={cn('ml-auto h-3.5 w-3.5', discordRunning ? 'text-mint' : 'text-faint')} />
-        <RefreshCw className={cn('h-3 w-3 opacity-50', isCheckingDiscord && 'animate-spin')} />
-      </button>
     </aside>
   );
 };

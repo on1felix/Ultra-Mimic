@@ -6,7 +6,6 @@ import {
   Hourglass,
   Layers,
   ListChecks,
-  Play,
   Square,
   Timer,
   WifiOff,
@@ -28,7 +27,6 @@ interface OverviewViewProps {
   runKind: 'games' | 'hours' | null;
   historyCount: number;
   discordRunning: boolean | null;
-  onStart: () => void;
   onStop: () => void;
 }
 
@@ -40,7 +38,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   runKind,
   historyCount,
   discordRunning,
-  onStart,
   onStop,
 }) => {
   const { u, language } = useUi();
@@ -181,15 +178,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              {active ? (
+              {active && (
                 <Button variant="secondary" onClick={onStop} className="px-4">
                   <Square className="h-3 w-3 fill-current" />
                   {u('common.finish')}
-                </Button>
-              ) : (
-                <Button size="sm" onClick={onStart} className="px-4">
-                  <Play className="h-3.5 w-3.5 fill-current" />
-                  {u('ov.quickStart')}
                 </Button>
               )}
             </div>

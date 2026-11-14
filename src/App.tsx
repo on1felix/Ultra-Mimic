@@ -20,7 +20,6 @@ import type { SpooferConfig, SpoofableGameItem } from '@/types/spoofer';
 
 const CONFIG_KEY = 'ultra-mimic.config';
 const LEGACY_CONFIG_KEY = 'mimic2.config';
-const HOLD_MIGRATION_KEY = 'ultra-mimic.config.hold-3m';
 /** One-time repair: an accidental toggle-off re-ran games that were already done. */
 const HISTORY_MIGRATION_KEY = 'ultra-mimic.config.skip-history-2';
 
@@ -34,7 +33,6 @@ const DEFAULT_CONFIG: SpooferConfig = {
   cooldown_enabled: true,
   cooldown_every_n_batches: 1,
   cooldown_seconds: 20,
-  jitter_enabled: true,
   exclude_adult: true,
 };
 
@@ -68,16 +66,10 @@ function readConfig(): SpooferConfig {
     cooldown_seconds: 20,
   };
 
-  // Move the old 185 s default to the new 3 min default once.
-  try {
-    if (window.localStorage.getItem(HOLD_MIGRATION_KEY) !== '1') {
-      if (next.hold_duration_secs === 185) {
-        next = { ...next, hold_duration_secs: 180 };
-      }
-      window.localStorage.setItem(HOLD_MIGRATION_KEY, '1');
-    }
-  } catch {
-    // storage unavailable: keep the in-memory defaults
+  // The 185 s hold is gone: it is not reachable with the 30 second slider, so
+  // old installs are moved back to the 3 min default.
+  if (next.hold_duration_secs === 185) {
+    next = { ...next, hold_duration_secs: 180 };
   }
 
   // Already spoofed games must never run again by accident: turn the history
@@ -120,11 +112,7 @@ export const App: React.FC = () => {
     actions,
   } = useSpooferEvents();
 
-  const {
-    isRunning: isDiscordRunning,
-    isChecking: isCheckingDiscord,
-    refetch: recheckDiscord,
-  } = useDiscordStatus(6000);
+  const { isRunning: isDiscordRunning, refetch: recheckDiscord } = useDiscordStatus(6000);
 
   // Remember the run settings between launches.
   useEffect(() => {
@@ -225,7 +213,6 @@ export const App: React.FC = () => {
             runKind={runKind}
             historyCount={historyCount}
             discordRunning={isDiscordRunning}
-            onStart={startGames}
             onStop={requestStop}
           />
         );
@@ -305,9 +292,6 @@ export const App: React.FC = () => {
         <Sidebar
           activeTab={tab}
           onTabChange={setTab}
-          discordRunning={isDiscordRunning}
-          isCheckingDiscord={isCheckingDiscord}
-          onCheckDiscord={() => void recheckDiscord()}
           historyCount={historyCount}
         />
 
@@ -316,7 +300,6 @@ export const App: React.FC = () => {
             tab={tab}
             status={status}
             discordRunning={isDiscordRunning}
-            isCheckingDiscord={isCheckingDiscord}
             onCheckDiscord={() => void recheckDiscord()}
           />
 

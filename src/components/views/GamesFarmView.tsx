@@ -7,7 +7,6 @@ import {
   ListFilter,
   Play,
   SlidersHorizontal,
-  Sparkles,
   Square,
   Timer,
 } from 'lucide-react';
@@ -68,8 +67,7 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
 
   const estimate = useMemo(() => {
     const batches = target;
-    // Jitter averages ~7 s (random 4–10 s), used as the estimate offset.
-    const hold = config.hold_duration_secs + (config.jitter_enabled ? 7 : 0);
+    const hold = config.hold_duration_secs;
     let seconds = batches * hold;
     if (config.cooldown_enabled && config.cooldown_every_n_batches > 0) {
       const pauses = Math.max(0, Math.ceil(batches / config.cooldown_every_n_batches) - 1);
@@ -220,20 +218,6 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
                   </span>
                 }
                 hint={u('gf.adultHint')}
-                disabled={locked}
-              />
-            </div>
-            <div className="rounded-xl border border-border bg-white/[0.02] px-3">
-              <Toggle
-                checked={Boolean(config.jitter_enabled)}
-                onChange={(value) => onConfigChange({ jitter_enabled: value })}
-                label={
-                  <span className="flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-faint" />
-                    {u('gf.jitter')}
-                  </span>
-                }
-                hint={u('gf.jitterHint')}
                 disabled={locked}
               />
             </div>

@@ -32,18 +32,7 @@ fn seconds_left(total: Duration, spent: Duration) -> u64 {
     ((left.as_millis() as u64) + 999) / 1000
 }
 
-/// Random hold bonus (4–10 s). Real randomness instead of a cycling 1–3
-/// pattern: the system clock is mixed with a splitmix-style hash.
-fn jitter_seconds() -> u64 {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_nanos() as u64)
-        .unwrap_or(0);
-    let mut x = nanos ^ (nanos >> 33);
-    x = x.wrapping_mul(0xff51_afd7_ed55_8ccd);
-    x ^= x >> 33;
-    4 + x % 7
-}
+
 
 /// Pause that follows a batch (0 when the cooldown manager is off).
 fn cooldown_pause_secs(config: &SpooferConfig) -> u64 {
@@ -55,9 +44,10 @@ fn cooldown_pause_secs(config: &SpooferConfig) -> u64 {
     }
 }
 
-/// Average game length: the hold plus the average jitter.
+/// Average game length: exactly the configured hold. Nothing is added on top,
+/// so the countdown and the estimate always agree with the real duration.
 fn average_hold_secs(config: &SpooferConfig) -> u64 {
-    config.hold_duration_secs + if config.jitter_enabled { 7 } else { 0 }
+    config.hold_duration_secs
 }
 
 /// Expected session length: every game at its average hold plus the pauses
@@ -753,16 +743,12 @@ pub async fn run_spoofer(
             tokio::time::sleep(Duration::from_millis(40)).await;
         }
 
-        // Calculate holding duration with optional organic jitter
-        let hold_secs = if config.jitter_enabled {
-            config.hold_duration_secs + jitter_seconds()
-        } else {
-            config.hold_duration_secs
-        };
+        // The hold is exactly what the user picked: no random addition, so the
+        // ring starts at a round value and every minute lasts a full minute.
         let hold_duration = if is_farm {
             config.farm_duration_secs.map(Duration::from_secs)
         } else {
-            Some(Duration::from_secs(hold_secs.clamp(3, 3600)))
+            Some(Duration::from_secs(config.hold_duration_secs.clamp(3, 3600)))
         };
 
         // Emit spoofer tick event
@@ -835,15 +821,25 @@ pub async fn run_spoofer(
 
         // Hold processes and RPC sessions for the duration
         let mut hold_start = Instant::now();
-        let mut last_farm_tick = Instant::now();
+        // Ticks are scheduled on an absolute grid (`start + 1 s`, `start + 2 s`, …)
+        // instead of "1 s after the previous tick". Resetting the timer on every
+        // iteration added ~50 ms of drift per tick, so the reported values fell
+        // behind the UI clock and the digits occasionally had to jump two
+        // seconds at once to catch up.
+        let mut next_tick = hold_start + Duration::from_secs(1);
         while hold_duration.map_or(true, |limit| hold_start.elapsed() < limit) {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
             }
 
             // Keep the UI timer live in every mode: the countdown must tick once a second.
-            if last_farm_tick.elapsed() >= Duration::from_secs(1) {
-                last_farm_tick = Instant::now();
+            let now = Instant::now();
+            if now >= next_tick {
+                next_tick += Duration::from_secs(1);
+                // A long stall (or a pause) must not fire a burst of catch-up ticks.
+                if next_tick <= now {
+                    next_tick = now + Duration::from_secs(1);
+                }
 
                 // A farm can run for hours: report games whose process died.
                 if is_farm {
@@ -863,7 +859,7 @@ pub async fn run_spoofer(
                     });
                 }
 
-                let held = hold_start.elapsed();
+                let held = now - hold_start;
                 let total = hold_duration.map(|d| d.as_secs()).unwrap_or(0);
                 let left = hold_duration
                     .map_or(0, |limit| seconds_left(limit, held));
@@ -917,6 +913,7 @@ pub async fn run_spoofer(
                     break;
                 }
                 hold_start += pause_start.elapsed();
+                next_tick += pause_start.elapsed();
                 *status_lock.write().await = SpooferStatus::Running;
                 let _ = app.emit(
                     "spoofer_status",

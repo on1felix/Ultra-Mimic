@@ -230,7 +230,9 @@ export function useSpooferEvents() {
   const stop = useCallback(async () => {
     try {
       setStatus('idle');
-      setTickData((prev) => ({ ...prev, active_batch: [], phase: 'idle' }));
+      // Drop the last hold tick too: leaving its remaining second behind made
+      // the idle ring freeze at 00:01 after stopping mid-hold.
+      setTickData({ ...EMPTY_TICK });
       await tauriApi.stopSpoofer();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

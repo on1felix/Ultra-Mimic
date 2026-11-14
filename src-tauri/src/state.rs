@@ -125,8 +125,6 @@ pub struct SpooferConfig {
     pub cooldown_every_n_batches: usize,
     #[serde(default = "default_cooldown_seconds")]
     pub cooldown_seconds: u64,
-    #[serde(default)]
-    pub jitter_enabled: bool,
     /// Farm mode: when non-empty, exactly these games run as one fixed batch.
     #[serde(default)]
     pub farm_game_ids: Vec<String>,

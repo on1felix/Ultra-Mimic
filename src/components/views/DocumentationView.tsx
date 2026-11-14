@@ -99,7 +99,7 @@ const RU: Copy = {
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Фарм игр',
-      text: 'Основной режим. Настройте удержание, лимит игр и фильтры: пропуск прогнанных, 18+ и джиттер. Пауза 20 секунд после каждой игры встроена и учитывается в оценке времени.',
+      text: 'Основной режим. Настройте удержание, лимит игр и фильтры: пропуск прогнанных и 18+. Пауза 20 секунд после каждой игры встроена и учитывается в оценке времени.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
@@ -132,7 +132,6 @@ const RU: Copy = {
     'Режим process-only: эмулируется только запуск .exe. RPC- и консольные режимы удалены, чтобы поведение было предсказуемым.',
     'Одна игра за раз: одновременно запускается только один процесс — Discord всё равно засчитывает только одну игру.',
     'После каждой игры процесс закрывается, выдерживается пауза 20 секунд, и только потом стартует следующая игра. Эта пауза всегда включена и входит в общую оценку времени.',
-    'Джиттер добавляет случайные 4–10 секунд к удержанию, чтобы интервалы не были одинаковыми.',
     'База Discord кэшируется локально и обновляется по кнопке. История и кэш лежат в %APPDATA%\\Ultra Mimic.',
     'Все данные остаются на компьютере: приложение не отправляет статистику и не требует аккаунта.',
   ],
@@ -196,7 +195,7 @@ const EN: Copy = {
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Game farm',
-      text: 'The main mode. Set hold, game limit and filters: skip played, 18+ and jitter. A 20 second pause after every game is built in and included in the time estimate.',
+      text: 'The main mode. Set hold, game limit and filters: skip played and 18+. A 20 second pause after every game is built in and included in the time estimate.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
@@ -229,7 +228,6 @@ const EN: Copy = {
     'Process-only mode: only the .exe launch is emulated. RPC and console modes were removed to keep behaviour predictable.',
     'One game at a time: only a single process runs at once — Discord counts only one game anyway.',
     'After every game the process closes, a 20 second pause follows, and only then the next game starts. The pause is always on and is included in the total estimate.',
-    'Jitter adds a random 4–10 seconds to the hold so intervals are not identical.',
     'The Discord database is cached locally and refreshed on demand. History and cache live in %APPDATA%\\Ultra Mimic.',
     'Everything stays on your PC: no statistics are sent and no account is required.',
   ],

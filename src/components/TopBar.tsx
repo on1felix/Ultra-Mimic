@@ -39,7 +39,6 @@ interface TopBarProps {
   tab: Tab;
   status: SpooferStatus;
   discordRunning: boolean | null;
-  isCheckingDiscord: boolean;
   onCheckDiscord: () => void;
 }
 
@@ -47,7 +46,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   tab,
   status,
   discordRunning,
-  isCheckingDiscord,
   onCheckDiscord,
 }) => {
   const { u } = useUi();
@@ -86,7 +84,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             <span className="hidden sm:inline">
               {discordRunning === null ? u('top.discordChecking') : discordRunning ? u('top.discordOn') : u('top.discordOff')}
             </span>
-            <RefreshCw className={cn('h-2.5 w-2.5 opacity-60', isCheckingDiscord && 'animate-spin')} />
+            <RefreshCw className="h-2.5 w-2.5 opacity-60 animate-spin [animation-duration:2.6s]" />
           </button>
         </div>
       </header>

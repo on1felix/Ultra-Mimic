@@ -134,9 +134,6 @@ const en = {
   'settings.cooldownEveryValue': 'Every {count} batches',
   'settings.cooldownDuration': 'Pause duration:',
   'settings.cooldownDurationValue': '{count} sec',
-  'settings.jitter': 'Organic delay jitter (+4..10 sec)',
-  'settings.jitterDesc':
-    'Adds a random offset to the batch hold time so the behaviour looks natural to Discord servers.',
   'settings.skip': 'Skip previously spoofed games',
   'settings.skipDesc': 'Excludes games that were already spoofed in previous sessions.',
   'settings.excludeAdult': 'Skip 18+ games',
@@ -330,9 +327,6 @@ const ru: Record<MessageKey, string> = {
   'settings.cooldownEveryValue': 'Каждые {count} батчей',
   'settings.cooldownDuration': 'Длительность паузы:',
   'settings.cooldownDurationValue': '{count} сек',
-  'settings.jitter': 'Органический джиттер задержки (+4..10 сек)',
-  'settings.jitterDesc':
-    'Случайное небольшое отклонение времени удержания батча, чтобы поведение выглядело максимально естественно для серверов Discord.',
   'settings.skip': 'Пропускать ранее запущенные игры',
   'settings.skipDesc':
     'Исключает повторный запуск игр, которые уже были успешно эмулированы в предыдущих сессиях.',
