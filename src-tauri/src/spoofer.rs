@@ -23,6 +23,15 @@ static DUMMY_EXE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/dummy"
 
 const MAX_FARM_GAMES: usize = 20;
 
+/// Whole seconds left, rounded up. The tick clock and the UI clock agree to a
+/// fraction of a second, but flooring the remainder made the first tick report
+/// `total - 2` (e.g. 15 → 13), so the digits skipped a second. Rounding up keeps
+/// one decrement per second, exactly like the reference site's `Math.ceil`.
+fn seconds_left(total: Duration, spent: Duration) -> u64 {
+    let left = total.saturating_sub(spent);
+    ((left.as_millis() as u64) + 999) / 1000
+}
+
 /// Random hold bonus (4–10 s). Real randomness instead of a cycling 1–3
 /// pattern: the system clock is mixed with a splitmix-style hash.
 fn jitter_seconds() -> u64 {
@@ -65,6 +74,9 @@ fn session_estimate_secs(config: &SpooferConfig, games: usize, batch_size: usize
 }
 
 /// Compact description of the upcoming batch, used by the UI countdown panel.
+/// How many upcoming games the queue preview shows (single next game).
+const QUEUE_PREVIEW: usize = 1;
+
 fn preview_games(pool: &[SpoofableGame], count: usize) -> Vec<NextGamePreview> {
     pool.iter()
         .take(count)
@@ -482,14 +494,16 @@ pub async fn run_spoofer(
             log_event(&app, "info", &cooldown_message);
             let cd_start = Instant::now();
             let cd_duration = Duration::from_secs(config.cooldown_seconds);
-            let mut last_cd_tick = cd_start;
+            // `None` means the cooldown tick has not been sent yet: report it on
+            // the first pass so the ring turns amber the moment the hold ends.
+            let mut last_cd_tick: Option<Instant> = None;
             while cd_start.elapsed() < cd_duration {
                 if cancel_flag.load(Ordering::SeqCst) {
                     break;
                 }
-                if last_cd_tick.elapsed() >= Duration::from_millis(500) {
-                    last_cd_tick = Instant::now();
-                    let left = cd_duration.saturating_sub(cd_start.elapsed()).as_secs();
+                if last_cd_tick.map_or(true, |t| t.elapsed() >= Duration::from_millis(500)) {
+                    last_cd_tick = Some(Instant::now());
+                    let left = seconds_left(cd_duration, cd_start.elapsed());
                     let _ = app.emit(
                         "spoofer_tick",
                         SpooferTickEvent {
@@ -510,7 +524,7 @@ pub async fn run_spoofer(
                             hold_total_secs: 0,
                             hold_remaining_secs: 0,
                             cooldown_remaining_secs: left,
-                            next_batch: preview_games(&pool, batch_size),
+                            next_batch: preview_games(&pool, QUEUE_PREVIEW),
                             pool_remaining: pool.len(),
                         },
                     );
@@ -851,7 +865,8 @@ pub async fn run_spoofer(
 
                 let held = hold_start.elapsed();
                 let total = hold_duration.map(|d| d.as_secs()).unwrap_or(0);
-                let left = hold_duration.map_or(0, |limit| limit.saturating_sub(held).as_secs());
+                let left = hold_duration
+                    .map_or(0, |limit| seconds_left(limit, held));
                 let _ = app.emit(
                     "spoofer_tick",
                     SpooferTickEvent {
@@ -875,7 +890,7 @@ pub async fn run_spoofer(
                         next_batch: if is_farm {
                             Vec::new()
                         } else {
-                            preview_games(&pool, batch_size)
+                            preview_games(&pool, QUEUE_PREVIEW)
                         },
                         pool_remaining: pool.len(),
                     },
@@ -920,6 +935,15 @@ pub async fn run_spoofer(
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
+        // Record the finished batch right away, before the cleanup and the
+        // breather: stopping the run at this point must not make the game look
+        // unplayed and launch it again next time. Farm games stay available for
+        // normal runs, and games that failed to start are retried next time.
+        if !is_farm && !cancel_flag.load(Ordering::SeqCst) {
+            let batch_ids: Vec<String> = active_batch_info.iter().map(|g| g.id.clone()).collect();
+            record_played_batch(&batch_ids);
+        }
+
         // Cleanup spawned child processes and temporary files
         for (mut child, _game, exe_path) in spawned_processes {
             let pid = child.id();
@@ -947,17 +971,23 @@ pub async fn run_spoofer(
             pids_guard.clear();
         }
 
-        // Record completed batch in persistent history (farm games stay available for normal runs)
-        if !is_farm && !cancel_flag.load(Ordering::SeqCst) {
-            // Games that failed to start are left out so they are retried next time
-            let batch_ids: Vec<String> = active_batch_info.iter().map(|g| g.id.clone()).collect();
-            record_played_batch(&batch_ids);
-        }
-
         processed_count += current_batch.len();
 
-        // Brief breather between batches to let the OS process table and Discord process watcher settle cleanly
-        if !cancel_flag.load(Ordering::SeqCst) && processed_count < target_count && !pool.is_empty() {
+        // What comes next decides the phase reported in the short gap between
+        // batches (and whether the extra breather is needed at all).
+        let has_next_batch = !cancel_flag.load(Ordering::SeqCst)
+            && processed_count < target_count
+            && !pool.is_empty();
+        let cooldown_next = has_next_batch
+            && !is_farm
+            && config.cooldown_enabled
+            && batch_counter > 0
+            && batch_counter % config.cooldown_every_n_batches.max(1) == 0;
+
+        // Brief breather between batches to let the OS process table and Discord
+        // process watcher settle cleanly. A cooldown already pauses long enough,
+        // so the extra 500 ms is skipped there.
+        if has_next_batch && !cooldown_next {
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
 
@@ -975,6 +1005,20 @@ pub async fn run_spoofer(
                 .saturating_sub(start_time.elapsed().as_secs())
         };
 
+        // The short gap between batches must not report an idle phase: the ring
+        // used to go red → neutral → amber there, so the cooldown seemed to
+        // start with a grey flash. Report whatever comes next instead.
+        let (gap_phase, gap_hold_total, gap_hold_remaining, gap_cooldown_remaining) = if cooldown_next
+        {
+            ("cooldown", 0, 0, config.cooldown_seconds)
+        } else if has_next_batch && !is_farm {
+            // The hold is over and the next one opens in a moment: keep the red
+            // zero ring instead of blanking the timer.
+            ("hold", hold_total_secs, 0, 0)
+        } else {
+            ("idle", 0, 0, 0)
+        };
+
         let _ = app.emit(
             "spoofer_tick",
             SpooferTickEvent {
@@ -986,11 +1030,15 @@ pub async fn run_spoofer(
                 games_per_minute: games_per_sec * 60.0,
                 succeeded_count,
                 failed_count,
-                phase: "idle".to_string(),
-                hold_total_secs: 0,
-                hold_remaining_secs: 0,
-                cooldown_remaining_secs: 0,
-                next_batch: Vec::new(),
+                phase: gap_phase.to_string(),
+                hold_total_secs: gap_hold_total,
+                hold_remaining_secs: gap_hold_remaining,
+                cooldown_remaining_secs: gap_cooldown_remaining,
+                next_batch: if has_next_batch {
+                    preview_games(&pool, QUEUE_PREVIEW)
+                } else {
+                    Vec::new()
+                },
                 pool_remaining: pool.len(),
             },
         );

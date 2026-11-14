@@ -162,14 +162,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         </div>
 
         <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
-          <span>{u('h.showing', { shown: visible.length, total: filtered.length })}</span>
+          <span>{u('h.showing', { shown: visible.length, total: games.length })}</span>
           <span>{u('h.note')}</span>
         </div>
       </Card>
 
       {/* List */}
       <div className="relative min-h-0 flex-1">
-        <div className="rule-t rule-b absolute -left-2 -right-2 bottom-4 top-0 overflow-y-auto overflow-x-hidden pb-10 pl-2 pt-2">
+        <div className="rule-t rule-b absolute -left-2 -right-2 bottom-0 top-0 overflow-y-auto overflow-x-hidden pb-10 pl-2 pt-2">
           {games.length === 0 ? (
             <Card>
               <EmptyState

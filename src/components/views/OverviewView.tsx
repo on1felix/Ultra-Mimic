@@ -88,20 +88,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             ? u('ov.finishedCaption')
             : u('ov.idleCaption');
 
-  const ringHint = isFarm
-    ? u('ov.farmInfo', {
-        count: tick.active_batch.length,
-        duration: holdTotal > 0 ? formatHold(holdTotal, language) : u('common.untilStopped'),
-      })
-    : isCooldown
-      ? u('ov.cooldownInfo', { hold: formatHold(config.cooldown_seconds, language) })
-      : isHold
-        ? u('ov.batchInfo', {
-            count: Math.max(tick.active_batch.length, tick.next_batch?.length ?? 0),
-            hold: formatHold(holdTotal, language),
-          })
-        : undefined;
-
   const done = tick.current_index;
   const total = tick.total_games;
   const pct = percent(done, total);
@@ -116,7 +102,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
     : pct;
 
   return (
-    <div className="h-full -mr-2 space-y-4 overflow-y-auto overflow-x-hidden pb-8 pt-4">
+    <div className="h-full -mr-2 space-y-4 overflow-y-auto overflow-x-hidden pb-8 pt-4 rule-b">
       {errorMessage && (
         <div className="flex items-start gap-2.5 rounded-2xl border border-rose/25 bg-rose/[0.08] px-4 py-3 text-[12px] text-rose">
           <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
@@ -145,7 +131,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             paused={status === 'paused'}
             cooldown={isCooldown}
             caption={caption}
-            hint={ringHint}
           />
 
           <div className="min-w-0 flex-1">
@@ -222,7 +207,6 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
           </p>
 
           <div className="mt-4 space-y-2.5 text-[12px]">
-            <Row label={u('gf.batchTitle')} value={`${config.batch_size}`} />
             <Row label={u('gf.holdTitle')} value={formatHold(config.hold_duration_secs, language)} />
             <Row
               label={u('ov.eta')}

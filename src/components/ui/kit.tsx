@@ -124,7 +124,7 @@ export const Toggle: React.FC<ToggleProps> = ({
           'block h-full w-[18px] rounded-[5px] border-2 bg-black/20',
           checked ? 'border-accent/50' : 'border-white/15'
         )}
-        animate={{ x: checked ? 22 : 0 }}
+        animate={{ x: checked ? 20 : 0 }}
         transition={{ type: 'spring', stiffness: 500, damping: 32 }}
       />
     </button>

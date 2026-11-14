@@ -8,6 +8,7 @@ import {
   Layers,
   ListChecks,
   MonitorPlay,
+  ShieldAlert,
   ShieldCheck,
   Smile,
   Sparkles,
@@ -33,6 +34,8 @@ interface Copy {
   title: string;
   subtitle: string;
   chips: string[];
+  warnTitle: string;
+  warnText: string;
   howTitle: string;
   howHint: string;
   steps: Step[];
@@ -54,6 +57,9 @@ const RU: Copy = {
   subtitle:
     'Локальный клиент для эмуляции игровой активности Discord. Запускает игры из базы, держит их нужное время и ведёт историю — без RPC, телеметрии и лишних настроек.',
   chips: ['process-only', 'локально', 'без телеметрии', 'история'],
+  warnTitle: 'Не запускайте во время настоящей игры',
+  warnText:
+    'Ultra Mimic не обходит античиты и не рассчитан на работу параллельно с реальной игрой. Эмуляцию активности, подмену процесса и запуск игры «рядом» античит может расценить как вмешательство — вплоть до бана аккаунта, блокировки по железу или потери прогресса. Используйте приложение только вне игры и на свой риск.',
   howTitle: 'Как это работает',
   howHint: 'Один цикл занимает несколько минут: игра → удержание → пауза 20 секунд → следующая игра.',
   steps: [
@@ -80,7 +86,6 @@ const RU: Copy = {
   plan: [
     { label: 'Игр за сессию', value: '100' },
     { label: 'Удержание', value: '3 мин' },
-    { label: 'Поток', value: '1' },
     { label: 'Пауза после игры', value: '20 сек' },
   ],
   sectionsTitle: 'Разделы приложения',
@@ -89,17 +94,17 @@ const RU: Copy = {
     {
       icon: <MonitorPlay className="h-4 w-4" />,
       name: 'Обзор',
-      text: 'Живая сводка: таймер текущей игры, прогресс и очередь следующих игр. Во время встроенной паузы кольцо таймера идёт назад и подсвечивается жёлтым. Отсюда удобно запускать быстрый прогон.',
+      text: 'Живая сводка: таймер текущей игры, прогресс и следующая игра. Во время встроенной паузы кольцо стоит полным и подсвечивается жёлтым. Отсюда удобно запускать быстрый прогон.',
     },
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Фарм игр',
-      text: 'Основной режим. Настройте удержание, размер партии, лимит игр и фильтры: пропуск прогнанных, 18+ и джиттер. Пауза 20 секунд после каждой игры встроена и учитывается в оценке времени.',
+      text: 'Основной режим. Настройте удержание, лимит игр и фильтры: пропуск прогнанных, 18+ и джиттер. Пауза 20 секунд после каждой игры встроена и учитывается в оценке времени.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
       name: 'Фарм часов',
-      text: 'Выберите до 20 игр и держите их вместе выбранное время. Слева — выбранные игры и длительность, справа — поиск по базе.',
+      text: 'Выберите одну игру и держите её выбранное время. Слева — выбранная игра и длительность, справа — поиск по базе.',
     },
     {
       icon: <History className="h-4 w-4" />,
@@ -125,7 +130,7 @@ const RU: Copy = {
   underTitle: 'Под капотом',
   under: [
     'Режим process-only: эмулируется только запуск .exe. RPC- и консольные режимы удалены, чтобы поведение было предсказуемым.',
-    'Партии: игры запускаются группами. Размер партии задаётся в «Фарме игр», по умолчанию 1 игра — так активность выглядит естественнее.',
+    'Одна игра за раз: одновременно запускается только один процесс — Discord всё равно засчитывает только одну игру.',
     'После каждой игры процесс закрывается, выдерживается пауза 20 секунд, и только потом стартует следующая игра. Эта пауза всегда включена и входит в общую оценку времени.',
     'Джиттер добавляет случайные 4–10 секунд к удержанию, чтобы интервалы не были одинаковыми.',
     'База Discord кэшируется локально и обновляется по кнопке. История и кэш лежат в %APPDATA%\\Ultra Mimic.',
@@ -138,6 +143,7 @@ const RU: Copy = {
     'История не доказывает, что Discord засчитал игру, — она фиксирует только завершённый запуск.',
     'Сессию можно завершить кнопкой «Завершить»: текущий прогон остановится, а история сохранится.',
     'Игры 18+ можно исключить одним переключателем в фильтрах.',
+    'В «Фарме часов» можно выбрать только одну игру — этого достаточно, Discord засчитывает одну активность.',
   ],
   footer:
     'Ultra Mimic — локальный инструмент. Он не связан с Discord и не изменяет клиент игры. Используйте его ответственно.',
@@ -148,6 +154,9 @@ const EN: Copy = {
   subtitle:
     'A local client for emulating Discord game activity. It launches games from the database, holds them for the right time and keeps a history — no RPC, no telemetry, no clutter.',
   chips: ['process-only', 'local', 'no telemetry', 'history'],
+  warnTitle: 'Do not run it during a real game',
+  warnText:
+    'Ultra Mimic does not bypass anti-cheat and is not meant to run alongside a real game. Activity emulation, process spoofing and launching a game in parallel can be treated as tampering by anti-cheat — up to an account ban, a hardware block or lost progress. Use the app only outside a game and at your own risk.',
   howTitle: 'How it works',
   howHint: 'One cycle takes a few minutes: launch → hold → 20 s pause → next game.',
   steps: [
@@ -174,7 +183,6 @@ const EN: Copy = {
   plan: [
     { label: 'Games per session', value: '100' },
     { label: 'Hold', value: '3 min' },
-    { label: 'Stream', value: '1' },
     { label: 'Pause after game', value: '20 s' },
   ],
   sectionsTitle: 'App sections',
@@ -183,17 +191,17 @@ const EN: Copy = {
     {
       icon: <MonitorPlay className="h-4 w-4" />,
       name: 'Overview',
-      text: 'Live snapshot: current game timer, progress and the upcoming game queue. During the built-in pause the ring drains backwards in amber. Start a quick run from here.',
+      text: 'Live snapshot: current game timer, progress and the next game. During the built-in pause the ring stays full in amber. Start a quick run from here.',
     },
     {
       icon: <Gamepad2 className="h-4 w-4" />,
       name: 'Game farm',
-      text: 'The main mode. Set hold, batch size, game limit and filters: skip played, 18+ and jitter. A 20 second pause after every game is built in and included in the time estimate.',
+      text: 'The main mode. Set hold, game limit and filters: skip played, 18+ and jitter. A 20 second pause after every game is built in and included in the time estimate.',
     },
     {
       icon: <Clock3 className="h-4 w-4" />,
       name: 'Hour farm',
-      text: 'Pick up to 20 games and hold them together for the chosen duration. Selection is on the left, database search on the right.',
+      text: 'Pick one game and hold it for the chosen duration. Selection is on the left, database search on the right.',
     },
     {
       icon: <History className="h-4 w-4" />,
@@ -219,7 +227,7 @@ const EN: Copy = {
   underTitle: 'Under the hood',
   under: [
     'Process-only mode: only the .exe launch is emulated. RPC and console modes were removed to keep behaviour predictable.',
-    'Batches: games launch in groups. Batch size is configured in Game farm; the default of 1 game looks more natural.',
+    'One game at a time: only a single process runs at once — Discord counts only one game anyway.',
     'After every game the process closes, a 20 second pause follows, and only then the next game starts. The pause is always on and is included in the total estimate.',
     'Jitter adds a random 4–10 seconds to the hold so intervals are not identical.',
     'The Discord database is cached locally and refreshed on demand. History and cache live in %APPDATA%\\Ultra Mimic.',
@@ -232,6 +240,7 @@ const EN: Copy = {
     'History does not prove Discord counted a game — it only records a completed launch.',
     'A session can be finished with the “Finish” button: the current run stops and history is kept.',
     'Adult games can be excluded with a single filter toggle.',
+    'Hour farm takes exactly one game — that is enough, since Discord counts a single activity.',
   ],
   footer:
     'Ultra Mimic is a local tool. It is not affiliated with Discord and does not modify game clients. Use it responsibly.',
@@ -245,7 +254,7 @@ export const DocumentationView: React.FC = () => {
   return (
     <div
       data-docs-root
-      className="h-full -mr-2 space-y-4 overflow-y-auto pb-8 pt-4"
+      className="h-full -mr-2 space-y-4 overflow-y-auto pb-8 pt-4 rule-b"
     >
       {/* Hero */}
       <Card className="border-accent/25">
@@ -272,6 +281,18 @@ export const DocumentationView: React.FC = () => {
                 </span>
               ))}
             </div>
+          </div>
+        </div>
+      </Card>
+
+      <Card className="border-rose/40 bg-rose/[0.07]">
+        <div className="flex items-start gap-3">
+          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border-2 border-rose/35 bg-rose/10">
+            <ShieldAlert className="h-4 w-4 text-rose" />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-rose">{c.warnTitle}</h3>
+            <p className="mt-1.5 break-words text-[12px] leading-relaxed text-rose/90">{c.warnText}</p>
           </div>
         </div>
       </Card>

@@ -58,13 +58,27 @@ pub fn load_history() -> HashSet<String> {
         return HashSet::new();
     }
 
-    match fs::read_to_string(&path) {
-        Ok(data) => match serde_json::from_str::<SpoofHistory>(&data) {
-            Ok(hist) => hist.played_ids,
-            Err(_) => HashSet::new(),
-        },
-        Err(_) => HashSet::new(),
+    if let Some(ids) = read_history_file(&path) {
+        return ids;
     }
+
+    // A damaged file must never silently restart every game: fall back to the
+    // last good copy that save_history keeps next to it.
+    let backup = path.with_extension("json.bak");
+    match read_history_file(&backup) {
+        Some(ids) => {
+            let _ = fs::copy(&backup, &path);
+            ids
+        }
+        None => HashSet::new(),
+    }
+}
+
+fn read_history_file(path: &std::path::Path) -> Option<HashSet<String>> {
+    let data = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<SpoofHistory>(&data)
+        .ok()
+        .map(|hist| hist.played_ids)
 }
 
 pub fn save_history(played_ids: &HashSet<String>) -> Result<(), String> {
@@ -73,7 +87,18 @@ pub fn save_history(played_ids: &HashSet<String>) -> Result<(), String> {
         played_ids: played_ids.clone(),
     };
     let json = serde_json::to_string_pretty(&hist).map_err(|e| e.to_string())?;
-    fs::write(&path, json).map_err(|e| e.to_string())?;
+
+    // Never truncate the real file in place: write a temp copy first and swap
+    // it in. A crash in the middle then leaves the previous history intact.
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, &json).map_err(|e| e.to_string())?;
+
+    let backup = path.with_extension("json.bak");
+    if path.exists() {
+        let _ = fs::copy(&path, &backup);
+    }
+
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -88,7 +113,10 @@ pub fn record_played_batch(new_ids: &[String]) {
 pub fn clear_history() -> Result<(), String> {
     let path = get_history_path();
     if path.exists() {
-        fs::remove_file(path).map_err(|e| e.to_string())?;
+        fs::remove_file(&path).map_err(|e| e.to_string())?;
     }
+    // Drop the recovery copies too, otherwise a later load would restore them.
+    let _ = fs::remove_file(path.with_extension("json.bak"));
+    let _ = fs::remove_file(path.with_extension("json.tmp"));
     Ok(())
 }

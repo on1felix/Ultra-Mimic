@@ -30,7 +30,7 @@ import { Button } from '@/components/ui/Button';
 import { Progress } from '@/components/ui/Progress';
 import type { SpooferStatus, SpooferTickEvent, SpoofableGameItem } from '@/types/spoofer';
 
-const MAX_FARM = 20;
+const MAX_FARM = 1;
 
 const DURATIONS: Array<{ value: number | null; key: 'hf.untilStopped' | 'hf.d1' | 'hf.d2' | 'hf.d4' | 'hf.d8' | 'hf.d12' | 'hf.d24' }> = [
   { value: null, key: 'hf.untilStopped' },
@@ -45,7 +45,6 @@ const DURATIONS: Array<{ value: number | null; key: 'hf.untilStopped' | 'hf.d1' 
 interface HoursFarmViewProps {
   games: SpoofableGameItem[];
   isFetchingGames: boolean;
-  isHistoryGame: (id: string) => boolean;
   status: SpooferStatus;
   tick: SpooferTickEvent;
   isHoursRun: boolean;
@@ -57,7 +56,6 @@ interface HoursFarmViewProps {
 export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
   games,
   isFetchingGames,
-  isHistoryGame,
   status,
   tick,
   isHoursRun,
@@ -84,14 +82,6 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
     [selected, byId]
   );
 
-  const usedExes = useMemo(() => {
-    const set = new Map<string, string>();
-    for (const game of selectedGames) {
-      if (game.rel_path) set.set(game.rel_path.toLowerCase(), game.id);
-    }
-    return set;
-  }, [selectedGames]);
-
   const results = useMemo(() => {
     const query = search.trim().toLowerCase();
     const list = games.filter((game) => {
@@ -107,13 +97,7 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
   }, [games, search, excludeAdult]);
 
   const toggleGame = (game: SpoofableGameItem) => {
-    if (selected.includes(game.id)) {
-      setSelected((prev) => prev.filter((id) => id !== game.id));
-      return;
-    }
-    if (selected.length >= MAX_FARM) return;
-    if (game.rel_path && usedExes.has(game.rel_path.toLowerCase())) return;
-    setSelected((prev) => [...prev, game.id]);
+    setSelected((prev) => (prev.includes(game.id) ? [] : [game.id]));
   };
 
   const farmTotal = tick.hold_total_secs ?? 0;
@@ -300,27 +284,17 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
               <div className="space-y-1">
                 {results.map((game) => {
                   const isSelected = selected.includes(game.id);
-                  const farmed = isHistoryGame(game.id);
-                  const conflict =
-                    !isSelected && game.rel_path
-                      ? usedExes.has(game.rel_path.toLowerCase())
-                      : false;
-                  const maxed = !isSelected && selected.length >= MAX_FARM;
-                  const disabled = farmed || conflict || maxed;
 
                   return (
                     <button
                       key={game.id}
                       type="button"
-                      disabled={disabled && !isSelected}
                       onClick={() => toggleGame(game)}
                       className={cn(
                         'flex w-full items-center gap-3 rounded-xl border px-2.5 py-2 text-left transition-all duration-200',
                         isSelected
                           ? 'border-accent/30 bg-accent/[0.08]'
-                          : disabled
-                            ? 'cursor-not-allowed border-transparent opacity-45'
-                            : 'border-transparent hover:border-white/[0.07] hover:bg-white/[0.03]'
+                          : 'border-transparent hover:border-white/[0.07] hover:bg-white/[0.03]'
                       )}
                     >
                       <GameIcon game={game} size={30} />
@@ -328,8 +302,6 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
                         <p className="truncate text-[12px] font-medium text-foreground/90">{game.name}</p>
                         <p className="truncate text-[10px] text-faint">{game.rel_path || game.id}</p>
                       </div>
-                      {farmed && <Badge tone="mint">{u('hf.inHistory')}</Badge>}
-                      {conflict && !farmed && <Badge tone="amber">{u('hf.exeConflict', { exe: game.rel_path ?? '' })}</Badge>}
                       {game.adult && <Badge tone="rose">18+</Badge>}
                       <Badge tone={game.method === 'rpc' ? 'discord' : 'neutral'}>
                         {game.method === 'rpc' ? 'RPC' : 'EXE'}
@@ -350,10 +322,6 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
               </div>
             )}
           </div>
-
-          {selected.length >= MAX_FARM && (
-            <p className="mt-2 shrink-0 text-[11px] text-amber/90">{u('hf.maxReached', { max: MAX_FARM })}</p>
-          )}
         </Card>
       </div>
     </div>

@@ -21,6 +21,8 @@ import type { SpooferConfig, SpoofableGameItem } from '@/types/spoofer';
 const CONFIG_KEY = 'ultra-mimic.config';
 const LEGACY_CONFIG_KEY = 'mimic2.config';
 const HOLD_MIGRATION_KEY = 'ultra-mimic.config.hold-3m';
+/** One-time repair: an accidental toggle-off re-ran games that were already done. */
+const HISTORY_MIGRATION_KEY = 'ultra-mimic.config.skip-history-2';
 
 /** Defaults: 100 games, 1 stream, 3 min hold, built-in 20 s pause after each game. */
 const DEFAULT_CONFIG: SpooferConfig = {
@@ -73,6 +75,20 @@ function readConfig(): SpooferConfig {
         next = { ...next, hold_duration_secs: 180 };
       }
       window.localStorage.setItem(HOLD_MIGRATION_KEY, '1');
+    }
+  } catch {
+    // storage unavailable: keep the in-memory defaults
+  }
+
+  // Already spoofed games must never run again by accident: turn the history
+  // filter back on once for installs where it was switched off.
+  try {
+    if (window.localStorage.getItem(HISTORY_MIGRATION_KEY) !== '1') {
+      next = { ...next, skip_previously_spoofed: true };
+      // Persist the repaired config right away so this is idempotent even if
+      // the initializer runs twice (React StrictMode in development).
+      window.localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
+      window.localStorage.setItem(HISTORY_MIGRATION_KEY, '1');
     }
   } catch {
     // storage unavailable: keep the in-memory defaults
@@ -160,6 +176,8 @@ export const App: React.FC = () => {
       ...config,
       // Only native process emulation is supported: no beta/RPC modes.
       spoof_mode: 'process_only',
+      // Single-stream farm: the batch control was removed from the UI.
+      batch_size: 1,
     }),
     [config]
   );
@@ -169,12 +187,16 @@ export const App: React.FC = () => {
 
   const startGames = useCallback(() => {
     setRunKind('games');
-    void actions.start(effectiveConfig);
+    setTab('overview');
+    // Explicitly clear the hours-farm fields: a games run is never a farm, so
+    // the history filter always applies and every finished game is recorded.
+    void actions.start({ ...effectiveConfig, farm_game_ids: [], farm_duration_secs: null });
   }, [actions, effectiveConfig]);
 
   const startHours = useCallback(
     (ids: string[], durationSecs: number | null) => {
       setRunKind('hours');
+      setTab('overview');
       void actions.start({
         ...effectiveConfig,
         farm_game_ids: ids,
@@ -225,7 +247,6 @@ export const App: React.FC = () => {
           <HoursFarmView
             games={games}
             isFetchingGames={isLoadingGames || isFetchingDatabase}
-            isHistoryGame={isHistoryGame}
             status={status}
             tick={tickData}
             isHoursRun={runKind === 'hours'}
@@ -299,7 +320,7 @@ export const App: React.FC = () => {
             onCheckDiscord={() => void recheckDiscord()}
           />
 
-          <main className="min-h-0 flex-1 overflow-hidden px-6">
+          <main className="min-h-0 flex-1 overflow-hidden px-6 pb-3">
             <AnimatePresence mode="wait">
               <motion.div
                 key={tab}

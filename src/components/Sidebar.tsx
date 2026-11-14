@@ -149,15 +149,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <Activity className={cn('ml-auto h-3.5 w-3.5', discordRunning ? 'text-mint' : 'text-faint')} />
         <RefreshCw className={cn('h-3 w-3 opacity-50', isCheckingDiscord && 'animate-spin')} />
       </button>
-
-      <div className="px-4 py-2.5">
-        <p className="flex items-center justify-between text-[10px] text-faint">
-          <span>v2.0.0</span>
-          <span className="inline-flex items-center gap-1">
-            <span className="h-1 w-1 rounded-full bg-mint" /> {u('sb.local')}
-          </span>
-        </p>
-      </div>
     </aside>
   );
 };

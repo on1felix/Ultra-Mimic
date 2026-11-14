@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { motion, useMotionValue, useTransform } from 'framer-motion';
+import React, { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { formatClock } from '@/lib/format';
 
@@ -18,29 +18,41 @@ interface TimerRingProps {
   cooldown?: boolean;
   /** Small uppercase caption above the clock. */
   caption: string;
-  /** Secondary line below the clock. */
-  hint?: string;
   size?: number;
   className?: string;
 }
 
-/** How long the arc takes to settle home when a window opens, closes or resets. */
-const RESET_SECS = 0.8;
+/**
+ * How long the arc takes to refill when a new window opens. This mirrors the
+ * reference site's `transition: stroke-dashoffset 0.3s linear`, so the ring
+ * glides home instead of snapping when one game ends and the next one starts.
+ */
+const REFILL_SECS = 0.3;
+
+/** Any jump bigger than this (in ring turns) is treated as a window change. */
+const JUMP = 0.02;
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
 /**
- * Big circular countdown used on the overview screen. It fills as the hold
- * window progresses and switches to red in the last moments.
+ * Big circular countdown used on the overview screen.
  *
- * Countdown: the arc runs on its own clock. One anchor per window (a value plus
- * the moment it was reported) is projected forward at exactly one second per
- * second, so the speed is constant. Ticks never restart it; they only correct
- * the anchor when the two clocks really disagree. That avoids the
- * stall-then-hurry jolt caused by re-tweening on every whole-second tick.
+ * The arc shows how much of the current hold has already passed: it starts
+ * empty at 12 o'clock and fills clockwise, like in the original build. The
+ * built-in cooldown keeps a calm, full amber ring and only the digits move.
  *
- * Transitions: start, stop and hold → pause make the arc glide to its new
- * place. The glide is stored as a decaying offset on top of the always-correct
- * countdown position, so the arc lands exactly on the countdown and never jumps
- * when the transition ends.
+ * Smoothness comes from one shared clock:
+ *
+ * - The countdown is projected from one anchor (a value plus the moment it was
+ *   reported), so it advances at exactly one second per second. Backend ticks
+ *   only correct the anchor when the clocks really diverge.
+ * - The digits are derived from the same projected clock with `Math.ceil` (the
+ *   reference site does the same), so they change once per second and never
+ *   skip a number.
+ * - The arc follows the projection every frame, so it never stutters, and a
+ *   short 0.3 s linear glide finishes a hold without a visible snap.
+ * - A new hold starts from an empty ring immediately: no backwards sweep and
+ *   no freeze while the next game boots.
  */
 export const TimerRing: React.FC<TimerRingProps> = ({
   remaining,
@@ -50,7 +62,6 @@ export const TimerRing: React.FC<TimerRingProps> = ({
   paused = false,
   cooldown = false,
   caption,
-  hint,
   size = 210,
   className,
 }) => {
@@ -59,66 +70,58 @@ export const TimerRing: React.FC<TimerRingProps> = ({
   const circumference = 2 * Math.PI * radius;
   const hasWindow = total > 0;
 
-  const arc = useMotionValue(
-    hasWindow ? Math.min(1, Math.max(0, cooldown ? remaining / total : (total - remaining) / total)) : 1
-  );
-  const dashoffset = useTransform(arc, (value) => circumference * (1 - value));
-
   /** Anchor of the current window: `at` (ms) ↔ `value` (seconds left). */
-  const anchor = useRef({
-    at: 0,
-    value: remaining,
-    key: '',
-    primed: false,
-    paused: false,
-  });
-  /** Decaying offset used by the transition, laid on top of the countdown. */
-  const reset = useRef({ offset: 0, at: 0, dur: RESET_SECS });
+  const anchor = useRef({ at: 0, value: remaining, key: '', primed: false, paused: false });
+  /** Current visual position of the arc (0 = empty, 1 = full ring). */
+  const shown = useRef(hasWindow ? clamp01(remaining / total) : 1);
+  /** Refill glide: `from` is where the jump started, `at` is its timestamp. */
+  const glide = useRef({ from: shown.current, at: 0 });
+
+  const circleRef = useRef<SVGCircleElement>(null);
   const windowKey = `${cooldown ? 'cooldown' : 'hold'}:${total}:${hasWindow}`;
 
   // Live values for the animation loop, so it never has to restart.
-  const live = useRef({ paused, total, hasWindow, cooldown });
-  live.current = { paused, total, hasWindow, cooldown };
+  const live = useRef({ total, elapsed, hasWindow, cooldown });
+  live.current = { total, elapsed, hasWindow, cooldown };
 
+  const initialSecs = hasWindow
+    ? Math.max(0, Math.ceil(remaining))
+    : Math.max(0, Math.floor(elapsed));
+  const [clockSecs, setClockSecs] = useState(initialSecs);
+  const clockRef = useRef(initialSecs);
+
+  // Take a new anchor when a window opens, changes length or the run restarts.
   useEffect(() => {
     const now = performance.now();
     const a = anchor.current;
-    const projected = a.primed ? a.value - (now - a.at) / 1000 : remaining;
-    // A new window: first tick, another batch, or hold ↔ pause.
+    const projected = a.primed && !a.paused ? a.value - (now - a.at) / 1000 : remaining;
+    // A new window reports a value clearly ahead of the projection (a new hold
+    // always starts at `total`), or the window key itself changed.
     const isNewWindow = !a.primed || a.key !== windowKey || remaining > projected + 2;
 
     if (!isNewWindow) {
-      // Same window: keep the existing anchor, fix it only on a real desync.
-      if (Math.abs(projected - remaining) > 1.2) {
+      // Same window: keep the anchor, correct it only on a real desync.
+      if (!a.paused && Math.abs(projected - remaining) > 1.5) {
         a.at = now;
         a.value = remaining;
       }
       return;
     }
 
-    const target = !hasWindow || total <= 0
-      ? 1
-      : Math.min(1, Math.max(0, cooldown ? remaining / total : (total - remaining) / total));
-
-    // Keep the current visual position, then let this offset fade out while the
-    // countdown advances underneath it. Nothing jumps at the end of it.
-    reset.current = { offset: arc.get() - target, at: now, dur: RESET_SECS };
-
     a.at = now;
     a.value = remaining;
     a.key = windowKey;
     a.primed = true;
     a.paused = paused;
-  }, [remaining, windowKey, paused, hasWindow, total, cooldown, arc]);
+  }, [remaining, windowKey, paused]);
 
-  // Pause: freeze the anchor in place, then restart it on resume.
+  // Pause freezes the projected clock; resuming re-anchors it where it stopped.
   useEffect(() => {
     const now = performance.now();
     const a = anchor.current;
     if (!a.primed) return;
     if (paused && !a.paused) {
-      const spent = Math.max(0, now - a.at) / 1000;
-      a.value = Math.max(0, a.value - spent);
+      a.value = Math.max(0, a.value - (now - a.at) / 1000);
       a.paused = true;
     } else if (!paused && a.paused) {
       a.at = now;
@@ -126,36 +129,73 @@ export const TimerRing: React.FC<TimerRingProps> = ({
     }
   }, [paused]);
 
+  // One animation frame at a time: the arc and the digits share one clock.
   useEffect(() => {
     let raf = 0;
-    const tick = (now: number) => {
+    const paint = (now: number) => {
       const a = anchor.current;
-      if (a.primed) {
-        const { total: window, hasWindow: bounded, cooldown: isCooldown } = live.current;
-        const raw = a.paused ? a.value : a.value - (now - a.at) / 1000;
-        const value = bounded ? Math.max(0, Math.min(window, raw)) : Math.max(0, raw);
-        const target =
-          !bounded || window <= 0 ? 1 : isCooldown ? value / window : (window - value) / window;
+      const {
+        total: window,
+        hasWindow: bounded,
+        elapsed: spent,
+        cooldown: isCooldown,
+      } = live.current;
 
-        const r = reset.current;
-        let shown = target;
-        if (r.offset !== 0) {
-          const progress = (now - r.at) / (r.dur * 1000);
-          if (progress >= 1) {
-            r.offset = 0;
-          } else {
-            const eased = 1 - Math.pow(1 - Math.max(0, progress), 3);
-            shown = target + r.offset * (1 - eased);
-          }
+      if (a.primed) {
+        const raw = a.paused ? a.value : a.value - (now - a.at) / 1000;
+        const left = Math.max(0, raw);
+
+        // Digits: bounded windows count down with ceil (never skip a second),
+        // open-ended farm runs count up with floor.
+        const nextSecs = bounded ? Math.ceil(left) : Math.max(0, Math.floor(spent));
+        if (nextSecs !== clockRef.current) {
+          clockRef.current = nextSecs;
+          setClockSecs(nextSecs);
         }
 
-        arc.set(Math.min(1, Math.max(0, shown)));
+        // Arc: the hold fills from empty to full (like the original build).
+        // The built-in cooldown keeps a calm, full amber ring: only the digits
+        // move, the arc does not sweep.
+        const target =
+          isCooldown || !bounded || window <= 0
+            ? 1
+            : clamp01((window - left) / window);
+
+        let value = shown.current;
+        if (target < value - JUMP) {
+          // A new hold after a pause: start from an empty ring right away.
+          value = target;
+          glide.current.at = 0;
+        } else if (target > value + JUMP) {
+          if (now - glide.current.at > REFILL_SECS * 1000) {
+            glide.current = { from: value, at: now };
+          }
+          const age = (now - glide.current.at) / (REFILL_SECS * 1000);
+          if (glide.current.at > 0 && age < 1) {
+            // Linear 0.3 s glide, like the site's CSS transition.
+            value = glide.current.from + (target - glide.current.from) * Math.max(0, age);
+          } else {
+            value = target;
+            glide.current.at = 0;
+          }
+        } else {
+          value = target;
+          glide.current.at = 0;
+        }
+        shown.current = clamp01(value);
+
+        if (circleRef.current) {
+          circleRef.current.style.strokeDashoffset = String(
+            circumference * (1 - shown.current)
+          );
+        }
       }
-      raf = requestAnimationFrame(tick);
+
+      raf = requestAnimationFrame(paint);
     };
-    raf = requestAnimationFrame(tick);
+    raf = requestAnimationFrame(paint);
     return () => cancelAnimationFrame(raf);
-  }, [arc]);
+  }, [circumference]);
 
   const ringColor = danger
     ? '#D97C86'
@@ -166,7 +206,7 @@ export const TimerRing: React.FC<TimerRingProps> = ({
   // HH:MM:SS is 8 characters and just fits the ring. A ninth character only
   // appears in infinite runs past 100 hours; shrink the clock instead of
   // letting it run into the stroke.
-  const clock = formatClock(hasWindow ? remaining : elapsed);
+  const clock = formatClock(clockSecs);
   const compactClock = clock.length > 8;
 
   return (
@@ -188,7 +228,8 @@ export const TimerRing: React.FC<TimerRingProps> = ({
           strokeWidth={stroke}
         />
 
-        <motion.circle
+        <circle
+          ref={circleRef}
           cx={size / 2}
           cy={size / 2}
           r={radius}
@@ -197,7 +238,8 @@ export const TimerRing: React.FC<TimerRingProps> = ({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          style={{ strokeDashoffset: dashoffset }}
+          strokeDashoffset={circumference * (1 - shown.current)}
+          style={{ transition: 'stroke 0.5s ease' }}
         />
       </svg>
 
@@ -224,9 +266,6 @@ export const TimerRing: React.FC<TimerRingProps> = ({
         >
           {clock}
         </span>
-        {hint && (
-          <span className="mt-2 max-w-[168px] break-words text-[11px] leading-snug text-muted">{hint}</span>
-        )}
       </div>
     </div>
   );

@@ -66,7 +66,7 @@ pub fn run() {
 
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Ultra Mimic")
-                .inner_size(1240.0, 820.0)
+                .inner_size(1240.0, 812.0)
                 .min_inner_size(1080.0, 720.0)
                 .resizable(true)
                 .decorations(false)
