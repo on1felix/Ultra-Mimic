@@ -14,7 +14,7 @@
 <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-2B2D35?style=flat-square" alt="Windows 10/11" />
 <img src="https://img.shields.io/badge/Tauri-2-2B2D35?style=flat-square" alt="Tauri 2" />
 <img src="https://img.shields.io/badge/React-18-2B2D35?style=flat-square" alt="React 18" />
-<img src="https://img.shields.io/badge/лицензия-MIT-2B2D35?style=flat-square" alt="MIT" />
+<img src="https://img.shields.io/badge/лицензия-GPLv3-2B2D35?style=flat-square" alt="GPLv3" />
 
 </div>
 
@@ -149,9 +149,15 @@ mimic 2.0
 
 Ultra Mimic — локальный инструмент. Он не связан с Discord, не изменяет клиент игры и не требует доступа к аккаунту. Используйте его ответственно и с учётом правил Discord.
 
+Программа предоставляется «как есть», без каких-либо гарантий. Автор не несёт ответственности за любые последствия её использования: блокировку, ограничение или удаление аккаунта Discord, аккаунтов игр и других сервисов, потерю данных, упущенную выгоду и иные убытки. Эмуляция активности может нарушать правила Discord и правила отдельных игр — решение использовать приложение и связанный с этим риск вы принимаете на себя.
+
 ## Лицензия
 
-[MIT](LICENSE) © Ultra Mimic
+[GNU GPL v3](LICENSE) © 2026 on1felix
+
+Проект распространяется по GNU General Public License v3.0. В файле [LICENSE](LICENSE) к тексту лицензии добавлены условия по §7: они сохраняют указание авторства, требуют помечать изменённые версии и запрещают выдавать форки за оригинал.
+
+Репозиторий: [github.com/on1felix/Ultra-Mimic](https://github.com/on1felix/Ultra-Mimic)
 
 <div align="center">
 <sub><a href="README.en.md">Read this in English</a></sub>

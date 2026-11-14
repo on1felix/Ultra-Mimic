@@ -14,7 +14,7 @@ Launches games from the Discord database, holds them for the right time and keep
 <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-2B2D35?style=flat-square" alt="Windows 10/11" />
 <img src="https://img.shields.io/badge/Tauri-2-2B2D35?style=flat-square" alt="Tauri 2" />
 <img src="https://img.shields.io/badge/React-18-2B2D35?style=flat-square" alt="React 18" />
-<img src="https://img.shields.io/badge/license-MIT-2B2D35?style=flat-square" alt="MIT" />
+<img src="https://img.shields.io/badge/license-GPLv3-2B2D35?style=flat-square" alt="GPLv3" />
 
 </div>
 
@@ -149,9 +149,15 @@ mimic 2.0
 
 Ultra Mimic is a local tool. It is not affiliated with Discord, does not modify game clients and needs no account access. Use it responsibly and in line with Discord rules.
 
+The software is provided "as is", without warranty of any kind. The author is not liable for any consequences of using it: suspension, restriction or deletion of Discord accounts, game accounts or other services, data loss, lost profits or any other damages. Activity emulation may violate Discord's rules and the rules of individual games — you accept the decision to use the app and the associated risk.
+
 ## License
 
-[MIT](LICENSE) © Ultra Mimic
+[GNU GPL v3](LICENSE) © 2026 on1felix
+
+Ultra Mimic is distributed under the GNU General Public License v3.0. The [LICENSE](LICENSE) file adds terms under section 7 of the GPL: they preserve attribution, require marking modified versions and forbid presenting forks as the original project.
+
+Repository: [github.com/on1felix/Ultra-Mimic](https://github.com/on1felix/Ultra-Mimic)
 
 <div align="center">
 <sub><a href="README.md">Читать на русском</a></sub>
