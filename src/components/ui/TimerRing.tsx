@@ -163,6 +163,12 @@ export const TimerRing: React.FC<TimerRingProps> = ({
       ? '#D9AE5F'
       : '#8E85A3';
 
+  // HH:MM:SS is 8 characters and just fits the ring. A ninth character only
+  // appears in infinite runs past 100 hours; shrink the clock instead of
+  // letting it run into the stroke.
+  const clock = formatClock(hasWindow ? remaining : elapsed);
+  const compactClock = clock.length > 8;
+
   return (
     <div
       className={cn('relative flex flex-col items-center justify-center', className)}
@@ -211,11 +217,12 @@ export const TimerRing: React.FC<TimerRingProps> = ({
         </span>
         <span
           className={cn(
-            'num mt-1 font-mono text-[38px] font-semibold leading-none tracking-tight transition-colors duration-500',
+            'num mt-1 font-mono font-semibold leading-none tracking-tight transition-colors duration-500',
+            compactClock ? 'text-[30px]' : 'text-[38px]',
             danger ? 'text-rose' : cooldown || paused ? 'text-amber' : 'text-foreground'
           )}
         >
-          {formatClock(hasWindow ? remaining : elapsed)}
+          {clock}
         </span>
         {hint && (
           <span className="mt-2 max-w-[168px] break-words text-[11px] leading-snug text-muted">{hint}</span>

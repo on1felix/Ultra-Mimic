@@ -46,6 +46,7 @@ if errorlevel 1 goto :err
 rem 4. Frontend dependencies.
 if not exist "node_modules" (
   echo Installing npm dependencies...
+  set "npm_config_cache=F:\npm-cache"
   call npm ci
   if errorlevel 1 goto :err
 )
@@ -88,7 +89,8 @@ exit /b 1
 rem Applies the Visual Studio environment when link.exe is not on PATH.
 :vcvars
 set "VCVARS="
-for /f "delims=" %%I in ('dir /b /s "F:\mimic\toolchain\vs\vcvars64.bat" 2^>nul') do if not defined VCVARS set "VCVARS=%%I"
+if exist "F:\BuildTools\VC\Auxiliary\Build\vcvars64.bat" set "VCVARS=F:\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+if not defined VCVARS for /f "delims=" %%I in ('dir /b /s "F:\mimic\toolchain\vs\vcvars64.bat" 2^>nul') do if not defined VCVARS set "VCVARS=%%I"
 if not defined VCVARS (
   echo [ERROR] vcvars64.bat not found. Visual Studio Build Tools ^(C++^) required.
   exit /b 1
