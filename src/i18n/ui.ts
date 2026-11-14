@@ -74,6 +74,12 @@ const ru = {
   'common.hoursShort': '{count} ч',
   'common.secondsShort': '{count} с',
 
+  // Stop run confirmation
+  'stop.confirmTitle': 'Завершить прогон?',
+  'stop.confirmMessage': 'Текущая игра остановится, а уже пройденные игры останутся в истории.',
+  'stop.confirmAction': 'Завершить',
+  'stop.cancel': 'Отмена',
+
   // Overview
   'ov.holdLeft': 'Идёт игра',
   'ov.paused': 'Пауза',
@@ -382,6 +388,12 @@ const en: Record<UIKey, string> = {
   'common.minutesShort': '{count} min',
   'common.hoursShort': '{count} h',
   'common.secondsShort': '{count} s',
+
+  // Stop run confirmation
+  'stop.confirmTitle': 'Stop the run?',
+  'stop.confirmMessage': 'The current game will stop, and games already farmed stay in the history.',
+  'stop.confirmAction': 'Stop',
+  'stop.cancel': 'Cancel',
 
   'ov.holdLeft': 'Game in progress',
   'ov.paused': 'Paused',

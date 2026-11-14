@@ -11,9 +11,11 @@ import { DatabaseView } from '@/components/views/DatabaseView';
 import { ConsoleView } from '@/components/views/ConsoleView';
 import { DocumentationView } from '@/components/views/DocumentationView';
 import { FakeStatusView } from '@/components/FakeStatusView';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useDiscordStatus } from '@/hooks/useDiscordStatus';
 import { useSpooferEvents } from '@/hooks/useSpooferEvents';
 import { tauriApi } from '@/lib/tauri';
+import { useUi } from '@/i18n/ui';
 import type { SpooferConfig, SpoofableGameItem } from '@/types/spoofer';
 
 const CONFIG_KEY = 'ultra-mimic.config';
@@ -80,9 +82,11 @@ function readConfig(): SpooferConfig {
 }
 
 export const App: React.FC = () => {
+  const { u } = useUi();
   const [tab, setTab] = useState<Tab>('overview');
   const [config, setConfig] = useState<SpooferConfig>(readConfig);
   const [runKind, setRunKind] = useState<'games' | 'hours' | null>(null);
+  const [confirmStop, setConfirmStop] = useState(false);
   const [games, setGames] = useState<SpoofableGameItem[]>([]);
   const [isLoadingGames, setIsLoadingGames] = useState(false);
 
@@ -180,6 +184,13 @@ export const App: React.FC = () => {
     [actions, effectiveConfig]
   );
 
+  const requestStop = useCallback(() => setConfirmStop(true), []);
+
+  const confirmStopRun = useCallback(() => {
+    setConfirmStop(false);
+    void actions.stop();
+  }, [actions]);
+
   const view = (() => {
     switch (tab) {
       case 'overview':
@@ -193,7 +204,7 @@ export const App: React.FC = () => {
             historyCount={historyCount}
             discordRunning={isDiscordRunning}
             onStart={startGames}
-            onStop={actions.stop}
+            onStop={requestStop}
           />
         );
       case 'games':
@@ -206,7 +217,7 @@ export const App: React.FC = () => {
             processGamesCount={processGamesCount}
             historyProcessCount={historyProcessCount}
             onStart={startGames}
-            onStop={actions.stop}
+            onStop={requestStop}
           />
         );
       case 'hours':
@@ -220,7 +231,7 @@ export const App: React.FC = () => {
             isHoursRun={runKind === 'hours'}
             excludeAdult={Boolean(config.exclude_adult)}
             onStart={startHours}
-            onStop={actions.stop}
+            onStop={requestStop}
           />
         );
       case 'history':
@@ -304,6 +315,16 @@ export const App: React.FC = () => {
           </main>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmStop}
+        title={u('stop.confirmTitle')}
+        message={u('stop.confirmMessage')}
+        confirmLabel={u('stop.confirmAction')}
+        cancelLabel={u('stop.cancel')}
+        onConfirm={confirmStopRun}
+        onCancel={() => setConfirmStop(false)}
+      />
     </div>
   );
 };

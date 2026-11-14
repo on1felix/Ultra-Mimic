@@ -21,6 +21,7 @@ import {
   Field,
   GameIcon,
   SectionLabel,
+  Segmented,
   Slider,
   Toggle,
 } from '@/components/ui/kit';
@@ -119,25 +120,17 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
             }
             hint={<span className="num font-mono text-accent-soft">{formatHold(config.hold_duration_secs, language)}</span>}
           >
-            <div className="grid grid-cols-5 gap-1.5">
-              {HOLD_PRESETS.map((preset) => (
-                <button
-                  key={preset.value}
-                  type="button"
-                  disabled={locked}
-                  onClick={() => onConfigChange({ hold_duration_secs: preset.value })}
-                  className={cn(
-                    'rounded-lg border py-1.5 text-[11px] font-medium transition-[color,background-color,border-color,transform] duration-150 active:scale-[0.97]',
-                    config.hold_duration_secs === preset.value
-                      ? 'border-accent/40 bg-accent/20 text-white'
-                      : 'border-border bg-white/[0.03] text-muted hover:border-accent/20 hover:text-foreground',
-                    locked && 'cursor-not-allowed opacity-60'
-                  )}
-                >
-                  {u(preset.key)}
-                </button>
-              ))}
-            </div>
+            <Segmented<number>
+              className="mt-1 grid grid-cols-5"
+              size="sm"
+              value={config.hold_duration_secs}
+              disabled={locked}
+              onChange={(value) => onConfigChange({ hold_duration_secs: value })}
+              options={HOLD_PRESETS.map((preset) => ({
+                value: preset.value,
+                label: u(preset.key),
+              }))}
+            />
 
             <Slider
               min={15}
@@ -185,28 +178,17 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
         {/* Limit */}
         <div className="mt-5">
           <Field label={u('gf.limitTitle')} hint={u('gf.available', { count: available })}>
-            <div className="grid grid-cols-6 gap-1.5">
-              {LIMIT_PRESETS.map((preset) => {
-                const active = (config.limit ?? null) === preset;
-                return (
-                  <button
-                    key={String(preset)}
-                    type="button"
-                    disabled={locked}
-                    onClick={() => onConfigChange({ limit: preset })}
-                    className={cn(
-                      'num rounded-lg border py-1.5 text-[11px] font-semibold transition-all duration-200',
-                      active
-                        ? 'border-accent/40 bg-accent/20 text-white'
-                        : 'border-border bg-white/[0.03] text-muted hover:border-accent/20 hover:text-foreground',
-                      locked && 'cursor-not-allowed opacity-60'
-                    )}
-                  >
-                    {preset ?? u('gf.limitAll')}
-                  </button>
-                );
-              })}
-            </div>
+            <Segmented<string>
+              className="mt-1 grid grid-cols-6"
+              size="sm"
+              value={config.limit === null || config.limit === undefined ? 'all' : String(config.limit)}
+              disabled={locked}
+              onChange={(value) => onConfigChange({ limit: value === 'all' ? null : Number(value) })}
+              options={LIMIT_PRESETS.map((preset) => ({
+                value: preset === null ? 'all' : String(preset),
+                label: preset === null ? u('gf.limitAll') : String(preset),
+              }))}
+            />
 
             <div className="mt-2 flex items-center gap-2">
               <input
