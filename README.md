@@ -10,7 +10,6 @@
 <a href="README.md"><img src="https://img.shields.io/badge/RU-Русский-8E85A3?style=flat-square" alt="Русский" /></a>
 <a href="README.en.md"><img src="https://img.shields.io/badge/EN-English-2B2D35?style=flat-square" alt="English" /></a>
 
-<img src="https://img.shields.io/badge/версия-2.2.2-8E85A3?style=flat-square" alt="2.2.2" />
 <img src="https://img.shields.io/badge/Windows-10%20%7C%2011-2B2D35?style=flat-square" alt="Windows 10/11" />
 <img src="https://img.shields.io/badge/Tauri-2-2B2D35?style=flat-square" alt="Tauri 2" />
 <img src="https://img.shields.io/badge/React-18-2B2D35?style=flat-square" alt="React 18" />
