@@ -47,7 +47,7 @@ export const TitleBar: React.FC = () => {
         <span className="text-[13px] font-semibold tracking-wide text-foreground">Ultra Mimic</span>
         <span className="hidden text-[11.5px] text-faint sm:inline">Discord booster</span>
         <span className="rounded border border-border bg-white/[0.03] px-1.5 py-[1px] font-mono text-[10.5px] text-faint">
-          v2.0.0
+          v2.2.2
         </span>
       </div>
 

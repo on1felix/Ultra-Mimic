@@ -12,23 +12,22 @@ import { ConsoleView } from '@/components/views/ConsoleView';
 import { DocumentationView } from '@/components/views/DocumentationView';
 import { FakeStatusView } from '@/components/FakeStatusView';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { UpdateDialog } from '@/components/ui/UpdateDialog';
 import { useDiscordStatus } from '@/hooks/useDiscordStatus';
 import { useSpooferEvents } from '@/hooks/useSpooferEvents';
+import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 import { tauriApi } from '@/lib/tauri';
 import { useUi } from '@/i18n/ui';
 import type { SpooferConfig, SpoofableGameItem } from '@/types/spoofer';
 
 const CONFIG_KEY = 'ultra-mimic.config';
 const LEGACY_CONFIG_KEY = 'mimic2.config';
-/** One-time repair: an accidental toggle-off re-ran games that were already done. */
-const HISTORY_MIGRATION_KEY = 'ultra-mimic.config.skip-history-2';
 
 /** Defaults: 100 games, 1 stream, 3 min hold, built-in 20 s pause after each game. */
 const DEFAULT_CONFIG: SpooferConfig = {
   limit: 100,
   batch_size: 1,
   hold_duration_secs: 180,
-  skip_previously_spoofed: true,
   spoof_mode: 'process_only',
   cooldown_enabled: true,
   cooldown_every_n_batches: 1,
@@ -72,20 +71,6 @@ function readConfig(): SpooferConfig {
     next = { ...next, hold_duration_secs: 180 };
   }
 
-  // Already spoofed games must never run again by accident: turn the history
-  // filter back on once for installs where it was switched off.
-  try {
-    if (window.localStorage.getItem(HISTORY_MIGRATION_KEY) !== '1') {
-      next = { ...next, skip_previously_spoofed: true };
-      // Persist the repaired config right away so this is idempotent even if
-      // the initializer runs twice (React StrictMode in development).
-      window.localStorage.setItem(CONFIG_KEY, JSON.stringify(next));
-      window.localStorage.setItem(HISTORY_MIGRATION_KEY, '1');
-    }
-  } catch {
-    // storage unavailable: keep the in-memory defaults
-  }
-
   return next;
 }
 
@@ -113,6 +98,8 @@ export const App: React.FC = () => {
   } = useSpooferEvents();
 
   const { isRunning: isDiscordRunning, refetch: recheckDiscord } = useDiscordStatus(6000);
+  // GitHub release check runs once per launch; a swap waits for an idle app.
+  const autoUpdate = useAutoUpdate(status === 'running' || status === 'paused');
 
   // Remember the run settings between launches.
   useEffect(() => {
@@ -173,6 +160,22 @@ export const App: React.FC = () => {
   const historyIds = useMemo(() => new Set(historyGames.map((game) => game.id)), [historyGames]);
   const isHistoryGame = useCallback((id: string) => historyIds.has(id), [historyIds]);
 
+  // Exact size of the pool the backend will build for a games run: native
+  // processes only, 18+ removed when that filter is on, and everything already
+  // in history removed — the history filter is built in and cannot be turned
+  // off. Deriving it from the real game list (instead of "all processes minus
+  // history") keeps "available" from counting games the run can never select.
+  const availableProcessCount = useMemo(
+    () =>
+      games.filter(
+        (game) =>
+          game.method === 'process' &&
+          !(config.exclude_adult && game.adult) &&
+          !historyIds.has(game.id)
+      ).length,
+    [games, config.exclude_adult, historyIds]
+  );
+
   const startGames = useCallback(() => {
     setRunKind('games');
     setTab('overview');
@@ -223,8 +226,7 @@ export const App: React.FC = () => {
             onConfigChange={updateConfig}
             status={status}
             tick={tickData}
-            processGamesCount={processGamesCount}
-            historyProcessCount={historyProcessCount}
+            availableCount={availableProcessCount}
             onStart={startGames}
             onStop={requestStop}
           />
@@ -328,6 +330,16 @@ export const App: React.FC = () => {
         cancelLabel={u('stop.cancel')}
         onConfirm={confirmStopRun}
         onCancel={() => setConfirmStop(false)}
+      />
+
+      <UpdateDialog
+        info={autoUpdate.info}
+        progress={autoUpdate.progress}
+        waiting={autoUpdate.waiting}
+        installing={autoUpdate.installing}
+        error={autoUpdate.error}
+        onRetry={autoUpdate.retry}
+        onDismiss={autoUpdate.dismiss}
       />
     </div>
   );

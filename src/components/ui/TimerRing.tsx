@@ -6,16 +6,21 @@ import { formatClock } from '@/lib/format';
 interface TimerRingProps {
   /** Seconds left in the current window. */
   remaining: number;
+  /**
+   * Exact time left in milliseconds. The clock is anchored on it, so a restore
+   * after a hidden window lands on the true time instead of a whole second.
+   */
+  remainingMs?: number;
   /** Length of the current window in seconds (0 = no fixed window). */
   total: number;
   /** Seconds already spent in the current window. */
   elapsed: number;
-  /** Turn the ring red when the window is about to expire. */
-  danger?: boolean;
   /** Freeze the ring while the run is paused. */
   paused?: boolean;
   /** Built-in pause between games: drain counter-clockwise in amber. */
   cooldown?: boolean;
+  /** Reports the digits currently on screen (single source for the red state). */
+  onClock?: (seconds: number) => void;
   /** Small uppercase caption above the clock. */
   caption: string;
   size?: number;
@@ -31,6 +36,13 @@ const REFILL_SECS = 0.3;
 
 /** Any jump bigger than this (in ring turns) is treated as a window change. */
 const JUMP = 0.02;
+
+/**
+ * Largest clock correction accepted inside one window. The local projection
+ * runs on `performance.now`, so a real difference is only the latency of a
+ * tick; anything bigger is a stale reading delivered after a hidden window.
+ */
+const MAX_FIX_SECS = 0.5;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 
@@ -53,14 +65,18 @@ const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
  *   short 0.3 s linear glide finishes a hold without a visible snap.
  * - A new hold starts from an empty ring immediately: no backwards sweep and
  *   no freeze while the next game boots.
+ * - The anchor is taken from the millisecond value of the backend tick, so a
+ *   restore after a hidden window lands on the exact remaining time (to the
+ *   millisecond) instead of the nearest whole second.
  */
 export const TimerRing: React.FC<TimerRingProps> = ({
   remaining,
+  remainingMs,
   total,
   elapsed,
-  danger = false,
   paused = false,
   cooldown = false,
+  onClock,
   caption,
   size = 210,
   className,
@@ -72,6 +88,12 @@ export const TimerRing: React.FC<TimerRingProps> = ({
 
   /** Anchor of the current window: `at` (ms) ↔ `value` (seconds left). */
   const anchor = useRef({ at: 0, value: remaining, key: '', primed: false, paused: false });
+  /** Latest exact reading from the backend: `ms` left at `at` (performance.now). */
+  const truth = useRef({
+    ms: remainingMs ?? remaining * 1000,
+    at: 0,
+    has: remainingMs != null,
+  });
   /** Current visual position of the arc (0 = empty, 1 = full ring). */
   const shown = useRef(hasWindow ? clamp01(remaining / total) : 1);
   /** Refill glide: `from` is where the jump started, `at` is its timestamp. */
@@ -94,26 +116,59 @@ export const TimerRing: React.FC<TimerRingProps> = ({
   useEffect(() => {
     const now = performance.now();
     const a = anchor.current;
-    const projected = a.primed && !a.paused ? a.value - (now - a.at) / 1000 : remaining;
+    // Keep the exact reading of every tick: `at` is when it actually arrived,
+    // so the value can be projected forward without losing precision.
+    if (remainingMs != null && !paused) {
+      truth.current = { ms: remainingMs, at: now, has: true };
+    }
+    // Truth projected to this instant (seconds). Falls back to the whole-second
+    // prop when the backend sends no millisecond value.
+    const exact = truth.current.has
+      ? Math.max(0, truth.current.ms / 1000 - (now - truth.current.at) / 1000)
+      : remaining;
+    const projected = a.primed && !a.paused ? a.value - (now - a.at) / 1000 : exact;
+    // The backend says this window is over: snap to 00:00 instead of waiting
+    // for the local projection to reach zero. A late frame used to keep 00:01
+    // on screen for the whole final frame.
+    if (hasWindow && remaining === 0 && exact <= 0 && !paused) {
+      a.at = now;
+      a.value = 0;
+      a.key = windowKey;
+      a.primed = true;
+      a.paused = false;
+      return;
+    }
     // A new window reports a value clearly ahead of the projection (a new hold
-    // always starts at `total`), or the window key itself changed.
-    const isNewWindow = !a.primed || a.key !== windowKey || remaining > projected + 2;
+    // always starts at `total`), or the window key itself changed. The value
+    // must be near the full window too: a tick that merely arrived late also
+    // looks "ahead", and treating it as a new window used to push the whole
+    // countdown back by the delivery delay.
+    const startsAtFull = remaining >= total - 1;
+    const isNewWindow =
+      !a.primed || a.key !== windowKey || (remaining > projected + 2 && startsAtFull);
 
     if (!isNewWindow) {
-      // Same window: keep the anchor, correct it only on a real desync.
-      if (!a.paused && Math.abs(projected - remaining) > 1.5) {
-        a.at = now;
-        a.value = remaining;
+      // Same window: re-anchor on the exact reading. The projection runs on
+      // `performance.now`, so it never drifts by more than the delivery latency
+      // of a tick; a small forward nudge keeps the clock on the true deadline.
+      // A bigger jump means a stale queued tick arrived late (a hidden window),
+      // and honouring it would throw the countdown forward.
+      if (!a.paused) {
+        const ahead = exact - projected;
+        if (ahead > 0.001 && ahead < MAX_FIX_SECS) {
+          a.at = now;
+          a.value = exact;
+        }
       }
       return;
     }
 
     a.at = now;
-    a.value = remaining;
+    a.value = exact;
     a.key = windowKey;
     a.primed = true;
     a.paused = paused;
-  }, [remaining, windowKey, paused]);
+  }, [remaining, remainingMs, windowKey, paused]);
 
   // Pause freezes the projected clock; resuming re-anchors it where it stopped.
   useEffect(() => {
@@ -129,25 +184,27 @@ export const TimerRing: React.FC<TimerRingProps> = ({
     }
   }, [paused]);
 
+  // Digits catch up with a short cross-fade when the window returns. The
+  // projection never stops while hidden, so the truth is always the anchor.
+  const [syncing, setSyncing] = useState(false);
+  const syncingRef = useRef(false);
+  const syncTimer = useRef<number | undefined>(undefined);
+
   // Digits live on their own timer, not on an animation frame. Chromium throttles
   // (or pauses) rAF when the window is occluded, minimized or the machine is
-  // busy, and one skipped frame used to swallow a whole second on screen. The
-  // interval keeps firing even when frames are throttled, and the guard turns a
-  // late update into two quick steps instead of one two-second jump.
+  // busy, and one skipped frame used to swallow a whole second on screen.
   useEffect(() => {
     const tick = () => {
       const a = anchor.current;
-      if (!a.primed) return;
+      if (!a.primed || syncingRef.current) return;
       const { hasWindow: bounded, elapsed: spent } = live.current;
       const now = performance.now();
       const raw = a.paused ? a.value : a.value - (now - a.at) / 1000;
-      let next = bounded ? Math.ceil(Math.max(0, raw)) : Math.max(0, Math.floor(spent));
-      // A late update must not skip a digit while a countdown is running. Only
-      // bounded windows are clamped: an idle or open-ended ring has to be free
-      // to jump (for example straight to 00:00 when a run is stopped).
-      if (bounded && next < clockRef.current - 1) {
-        next = clockRef.current - 1;
-      }
+      const next = bounded ? Math.ceil(Math.max(0, raw)) : Math.max(0, Math.floor(spent));
+      // No "one missed second per 100 ms" replay: after a hidden window the gap
+      // can be many seconds, and replaying it looked like the countdown was
+      // fast-forwarding. Show the true digit instead; a real resync is animated
+      // once by the visibility handler below.
       if (next !== clockRef.current) {
         clockRef.current = next;
         setClockSecs(next);
@@ -157,6 +214,79 @@ export const TimerRing: React.FC<TimerRingProps> = ({
     const id = window.setInterval(tick, 100);
     return () => window.clearInterval(id);
   }, []);
+
+  // Coming back from a minimised or covered window: swap the digits for the
+  // real remaining time with a quick cross-fade instead of counting back
+  // through every missed second.
+  useEffect(() => {
+    const restore = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (syncingRef.current) return;
+      const a = anchor.current;
+      if (!a.primed) return;
+
+      // Re-anchor on the exact backend reading before reading the digits: any
+      // drift is corrected here, down to a single millisecond. `performance.now`
+      // keeps running while the window is hidden, so projecting the last tick
+      // gives the true remaining time and the ring lands exactly where the run
+      // really is, without replaying the missed seconds.
+      const now = performance.now();
+      const t = truth.current;
+      if (!a.paused && t.has) {
+        const exactNow = Math.max(0, t.ms / 1000 - (now - t.at) / 1000);
+        const projected = a.value - (now - a.at) / 1000;
+        const ahead = exactNow - projected;
+        if (ahead > 0 && ahead < MAX_FIX_SECS) {
+          a.value = exactNow;
+          a.at = now;
+        }
+      }
+
+      const read = () => {
+        const { hasWindow: bounded, elapsed: spent } = live.current;
+        const raw = a.paused ? a.value : a.value - (performance.now() - a.at) / 1000;
+        return bounded
+          ? Math.max(0, Math.ceil(Math.max(0, raw)))
+          : Math.max(0, Math.floor(spent));
+      };
+
+      const target = read();
+      if (target === clockRef.current) return;
+      if (Math.abs(target - clockRef.current) === 1) {
+        clockRef.current = target;
+        setClockSecs(target);
+        return;
+      }
+
+      syncingRef.current = true;
+      setSyncing(true);
+      window.clearTimeout(syncTimer.current);
+      syncTimer.current = window.setTimeout(() => {
+        const fresh = read();
+        clockRef.current = fresh;
+        setClockSecs(fresh);
+        syncingRef.current = false;
+        setSyncing(false);
+      }, 110);
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') restore();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('focus', onVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('focus', onVisibility);
+      window.clearTimeout(syncTimer.current);
+    };
+  }, []);
+
+  // Mirror the digits that are actually on screen to the parent, so the red
+  // state switches on the same second the user sees 00:30.
+  useEffect(() => {
+    onClock?.(clockSecs);
+  }, [clockSecs, onClock]);
 
   // One animation frame at a time: the arc follows the same anchor.
   useEffect(() => {
@@ -183,10 +313,14 @@ export const TimerRing: React.FC<TimerRingProps> = ({
 
         let value = shown.current;
         if (target < value - JUMP) {
-          // A new hold after a pause: start from an empty ring right away.
+          // Backwards only happens when a fresh hold opens: start from an empty
+          // ring at once, so there is no visible backwards sweep.
           value = target;
           glide.current.at = 0;
         } else if (target > value + JUMP) {
+          // Forward always glides, even when the window changes: finishing a
+          // run, dropping to the idle ring or returning from a hidden window
+          // should ease home instead of snapping.
           if (now - glide.current.at > REFILL_SECS * 1000) {
             glide.current = { from: value, at: now };
           }
@@ -217,6 +351,12 @@ export const TimerRing: React.FC<TimerRingProps> = ({
     return () => cancelAnimationFrame(raf);
   }, [circumference]);
 
+  // The digits themselves decide when the ring turns red: 30 seconds left
+  // means the moment 00:30 is on screen, not a tick that may arrive slightly
+  // before the digits catch up. Windows shorter than a minute keep half of
+  // their length so a 15 second hold does not start out red.
+  const dangerAt = total > 60 ? 30 : Math.max(5, Math.floor(total / 2));
+  const danger = hasWindow && !cooldown && !paused && clockSecs <= dangerAt;
   const ringColor = danger
     ? '#D97C86'
     : cooldown || paused
@@ -279,10 +419,14 @@ export const TimerRing: React.FC<TimerRingProps> = ({
         </span>
         <span
           className={cn(
-            'num mt-1 font-mono font-semibold leading-none tracking-tight transition-colors duration-500',
+            'num mt-1 font-mono font-semibold leading-none tracking-tight',
             compactClock ? 'text-[30px]' : 'text-[38px]',
             danger ? 'text-rose' : cooldown || paused ? 'text-amber' : 'text-foreground'
           )}
+          style={{
+            opacity: syncing ? 0.35 : 1,
+            transition: 'opacity 130ms ease, color 500ms ease',
+          }}
         >
           {clock}
         </span>

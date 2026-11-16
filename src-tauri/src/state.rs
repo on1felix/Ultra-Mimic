@@ -62,9 +62,17 @@ pub struct SpooferTickEvent {
     /// Seconds left until the current batch is swapped for the next one.
     #[serde(default)]
     pub hold_remaining_secs: u64,
+    /// The same value in milliseconds: the UI anchors its clock on it, so a
+    /// restore after a hidden window lands on the exact time, not on a whole
+    /// second.
+    #[serde(default)]
+    pub hold_remaining_ms: u64,
     /// Seconds left in the rate-limit cooldown, if one is running.
     #[serde(default)]
     pub cooldown_remaining_secs: u64,
+    /// Cooldown remaining in milliseconds, same purpose as the hold value.
+    #[serde(default)]
+    pub cooldown_remaining_ms: u64,
     /// Games queued for the next batch (empty in farm mode or at the end).
     #[serde(default)]
     pub next_batch: Vec<NextGamePreview>,
@@ -115,8 +123,6 @@ pub struct SpooferConfig {
     pub batch_size: usize,
     pub hold_duration_secs: u64,
     pub start_offset: Option<usize>,
-    #[serde(default)]
-    pub skip_previously_spoofed: bool,
     #[serde(default)]
     pub spoof_mode: SpoofMode,
     #[serde(default = "default_true")]

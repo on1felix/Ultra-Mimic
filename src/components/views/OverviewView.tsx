@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   AlertTriangle,
@@ -47,6 +47,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   const holdTotal = tick.hold_total_secs ?? 0;
   const holdRemaining = tick.hold_remaining_secs ?? 0;
   const cooldownRemaining = tick.cooldown_remaining_secs ?? 0;
+  // Millisecond values come from the backend deadlines, so the ring can land on
+  // the exact remaining time after a hidden window instead of a whole second.
+  const holdRemainingMs = tick.hold_remaining_ms ?? holdRemaining * 1000;
+  const cooldownRemainingMs = tick.cooldown_remaining_ms ?? cooldownRemaining * 1000;
 
   const isCooldown = phase === 'cooldown' && active;
   const isFarm = phase === 'farm' && active;
@@ -54,12 +58,18 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
 
   const ringTotal = isCooldown ? config.cooldown_seconds : holdTotal;
   const ringRemaining = isCooldown ? cooldownRemaining : holdRemaining;
+  const ringRemainingMs = isCooldown ? cooldownRemainingMs : holdRemainingMs;
+  // The timer ring reports the digits it draws; red switches on the same
+  // second those digits read 00:30.
+  const [ringSecs, setRingSecs] = useState(0);
+  const dangerAt = ringTotal > 60 ? 30 : Math.max(5, Math.floor(ringTotal / 2));
   const danger =
     active &&
+    status !== 'paused' &&
     !isFarm &&
     !isCooldown &&
     ringTotal > 0 &&
-    ringRemaining <= Math.max(10, Math.min(30, ringTotal * 0.15));
+    ringSecs <= dangerAt;
 
   const headline = !active
     ? status === 'finished'
@@ -122,9 +132,10 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
         <Card className="col-span-12 flex flex-col items-center gap-6 p-6 lg:col-span-8 lg:flex-row lg:items-center lg:gap-7">
           <TimerRing
             remaining={ringRemaining}
+            remainingMs={ringRemainingMs}
             total={ringTotal}
             elapsed={tick.elapsed_secs}
-            danger={danger}
+            onClock={setRingSecs}
             paused={status === 'paused'}
             cooldown={isCooldown}
             caption={caption}
@@ -173,7 +184,7 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
               <Progress
                 value={sessionProgress}
                 active={status === 'running'}
-                tone={isFarm ? 'amber' : danger ? 'rose' : 'accent'}
+                tone="accent"
               />
             </div>
 

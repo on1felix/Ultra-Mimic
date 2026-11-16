@@ -48,7 +48,11 @@ export interface SpooferTickEvent {
   phase?: 'hold' | 'farm' | 'cooldown' | 'idle';
   hold_total_secs?: number;
   hold_remaining_secs?: number;
+  /** Hold remaining in milliseconds: the ring anchors its clock on it. */
+  hold_remaining_ms?: number;
   cooldown_remaining_secs?: number;
+  /** Cooldown remaining in milliseconds. */
+  cooldown_remaining_ms?: number;
   next_batch?: NextGame[];
   pool_remaining?: number;
 }
@@ -99,7 +103,6 @@ export interface SpooferConfig {
   batch_size: number;
   hold_duration_secs: number;
   start_offset?: number;
-  skip_previously_spoofed?: boolean;
   spoof_mode: SpoofMode;
   /** Opt-in beta: allows non-native categories (RPC / console / SDK) to be selected. */
   beta_enabled?: boolean;

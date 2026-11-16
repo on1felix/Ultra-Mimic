@@ -2,6 +2,22 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Mutex;
+
+/// Serialises every read-modify-write of `history.json`.
+///
+/// The spoofer records a finished batch from its own task while the UI can
+/// return games to the pool or import a history file at the same moment. Two
+/// concurrent `load -> change -> save` cycles would otherwise keep only the
+/// last write, silently dropping the other change. Reads stay lock-free: a save
+/// swaps the file in atomically, so a reader always sees a complete copy.
+static HISTORY_LOCK: Mutex<()> = Mutex::new(());
+
+fn lock_history() -> std::sync::MutexGuard<'static, ()> {
+    // A panic while holding the lock must not turn every later history call
+    // into an error: the data on disk is still valid.
+    HISTORY_LOCK.lock().unwrap_or_else(|poison| poison.into_inner())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SpoofHistory {
@@ -103,14 +119,53 @@ pub fn save_history(played_ids: &HashSet<String>) -> Result<(), String> {
 }
 
 pub fn record_played_batch(new_ids: &[String]) {
+    let _guard = lock_history();
     let mut current = load_history();
+    let before = current.len();
     for id in new_ids {
         current.insert(id.clone());
     }
-    let _ = save_history(&current);
+    // Only touch the file when something actually changed: a repeated batch
+    // must not rewrite the history (and race with nothing at all).
+    if current.len() != before {
+        let _ = save_history(&current);
+    }
+}
+
+/// Puts the given ids back into the pool. Serialised against recording and
+/// importing, so a game finished at the same moment is not lost.
+pub fn remove_history_ids(ids: &[String]) -> Result<usize, String> {
+    let _guard = lock_history();
+    let mut current = load_history();
+    let before = current.len();
+    for id in ids {
+        current.remove(id);
+    }
+    let removed = before - current.len();
+    if removed > 0 {
+        save_history(&current)?;
+    }
+    Ok(removed)
+}
+
+/// Adds imported ids to the existing history. Serialised like the other
+/// read-modify-write operations.
+pub fn merge_history_ids(ids: impl IntoIterator<Item = String>) -> Result<usize, String> {
+    let _guard = lock_history();
+    let mut current = load_history();
+    let before = current.len();
+    for id in ids {
+        current.insert(id);
+    }
+    let added = current.len() - before;
+    if added > 0 {
+        save_history(&current)?;
+    }
+    Ok(added)
 }
 
 pub fn clear_history() -> Result<(), String> {
+    let _guard = lock_history();
     let path = get_history_path();
     if path.exists() {
         fs::remove_file(&path).map_err(|e| e.to_string())?;

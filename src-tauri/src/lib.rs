@@ -7,6 +7,7 @@ pub mod rpc;
 pub mod spoofer;
 pub mod state;
 pub mod storage;
+pub mod updater;
 
 use state::AppState;
 use tauri::{Manager, RunEvent, WebviewUrl, WebviewWindowBuilder};
@@ -54,6 +55,9 @@ pub fn run() {
             commands::start_fake_status,
             commands::stop_fake_status,
             commands::get_fake_status,
+            updater::check_update,
+            updater::download_update,
+            updater::apply_update,
         ])
         .setup(|app| {
             // Start from a clean profile even if the previous run was force-closed.
@@ -66,7 +70,7 @@ pub fn run() {
 
             let mut builder = WebviewWindowBuilder::new(app, "main", WebviewUrl::default())
                 .title("Ultra Mimic")
-                .inner_size(1240.0, 812.0)
+                .inner_size(1240.0, 816.0)
                 .min_inner_size(1080.0, 720.0)
                 .resizable(true)
                 .decorations(false)

@@ -3,7 +3,6 @@ import {
   Coffee,
   EyeOff,
   Gauge,
-  History,
   ListFilter,
   Play,
   SlidersHorizontal,
@@ -30,8 +29,8 @@ interface GamesFarmViewProps {
   onConfigChange: (patch: Partial<SpooferConfig>) => void;
   status: SpooferStatus;
   tick: SpooferTickEvent;
-  processGamesCount: number;
-  historyProcessCount: number;
+  /** Games the backend can actually pick: filters and history applied. */
+  availableCount: number;
   onStart: () => void;
   onStop: () => void;
 }
@@ -51,18 +50,14 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
   onConfigChange,
   status,
   tick,
-  processGamesCount,
-  historyProcessCount,
+  availableCount,
   onStart,
   onStop,
 }) => {
   const { u, language } = useUi();
   const locked = status === 'running' || status === 'paused';
 
-  const available = Math.max(
-    0,
-    processGamesCount - (config.skip_previously_spoofed ? historyProcessCount : 0)
-  );
+  const available = Math.max(0, availableCount);
   const target = config.limit == null ? available : Math.min(config.limit, available);
 
   const estimate = useMemo(() => {
@@ -193,20 +188,6 @@ export const GamesFarmView: React.FC<GamesFarmViewProps> = ({
           </div>
 
           <div className="mt-3 space-y-2">
-            <div className="rounded-xl border border-border bg-white/[0.02] px-3">
-              <Toggle
-                checked={Boolean(config.skip_previously_spoofed)}
-                onChange={(value) => onConfigChange({ skip_previously_spoofed: value })}
-                label={
-                  <span className="flex items-center gap-1.5">
-                    <History className="h-3.5 w-3.5 text-faint" />
-                    {u('gf.skip')}
-                  </span>
-                }
-                hint={u('gf.skipHint', { count: historyProcessCount })}
-                disabled={locked}
-              />
-            </div>
             <div className="rounded-xl border border-border bg-white/[0.02] px-3">
               <Toggle
                 checked={Boolean(config.exclude_adult)}

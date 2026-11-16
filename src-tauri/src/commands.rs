@@ -1,5 +1,5 @@
 use crate::discord::{is_discord_running, load_games, SpoofMethod};
-use crate::history::{clear_history as clear_history_fs, load_history, save_history};
+use crate::history::{clear_history as clear_history_fs, load_history};
 use crate::spoofer::{force_kill_pid, run_spoofer};
 use crate::state::{AppState, FetchProgressEvent, SpooferConfig, SpooferStatus};
 use crate::storage;
@@ -231,7 +231,9 @@ pub async fn stop_spoofer(
             phase: "idle".to_string(),
             hold_total_secs: 0,
             hold_remaining_secs: 0,
+            hold_remaining_ms: 0,
             cooldown_remaining_secs: 0,
+            cooldown_remaining_ms: 0,
             next_batch: Vec::new(),
             pool_remaining: 0,
         },
@@ -395,16 +397,7 @@ pub async fn get_history_games(
 /// Puts the selected games back into the pool so they can be spoofed again.
 #[tauri::command]
 pub fn remove_history_entries(ids: Vec<String>) -> Result<usize, String> {
-    let mut history = load_history();
-    let before = history.len();
-    for id in &ids {
-        history.remove(id);
-    }
-    let removed = before - history.len();
-    if removed > 0 {
-        save_history(&history)?;
-    }
-    Ok(removed)
+    crate::history::remove_history_ids(&ids)
 }
 
 #[tauri::command]
@@ -434,14 +427,7 @@ pub fn export_history() -> Result<String, String> {
 pub fn import_history(json_data: String) -> Result<usize, String> {
     let imported_list: Vec<String> = serde_json::from_str(&json_data)
         .map_err(|e| format!("Invalid history JSON format: {}", e))?;
-    let mut current = load_history();
-    let before_len = current.len();
-    for id in imported_list {
-        current.insert(id);
-    }
-    let added = current.len() - before_len;
-    save_history(&current)?;
-    Ok(added)
+    crate::history::merge_history_ids(imported_list)
 }
 
 /// Shows one custom status in Discord until it is stopped; replaces the previous one.

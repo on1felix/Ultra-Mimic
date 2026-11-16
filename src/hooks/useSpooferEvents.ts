@@ -23,7 +23,9 @@ const EMPTY_TICK: SpooferTickEvent = {
   phase: 'idle',
   hold_total_secs: 0,
   hold_remaining_secs: 0,
+  hold_remaining_ms: 0,
   cooldown_remaining_secs: 0,
+  cooldown_remaining_ms: 0,
   next_batch: [],
   pool_remaining: 0,
 };

@@ -131,8 +131,12 @@ const RU: Copy = {
   under: [
     'Режим process-only: эмулируется только запуск .exe. RPC- и консольные режимы удалены, чтобы поведение было предсказуемым.',
     'Одна игра за раз: одновременно запускается только один процесс — Discord всё равно засчитывает только одну игру.',
+    'Порядок игр в прогоне случайный: следующая игра выбирается из пула, а не по порядку базы. Фильтры (история, 18+) применяются до перемешивания, поэтому набор игр тот же.',
+    'Фильтр истории включён всегда: игра, полностью прошедшая удержание, больше не запускается повторно, и отключить это нельзя. Чтобы прогнать её снова, верните игру в пул из «Истории».',
+    'Свёрнутое окно не останавливает прогон: удержание и история идут в фоне. После возврата кольцо плавно подстраивается под реальное время (с точностью до миллисекунд), без перемотки пропущенных секунд.',
     'После каждой игры процесс закрывается, выдерживается пауза 20 секунд, и только потом стартует следующая игра. Эта пауза всегда включена и входит в общую оценку времени.',
     'База Discord кэшируется локально и обновляется по кнопке. История и кэш лежат в %APPDATA%\\Ultra Mimic.',
+    'Обновления проверяются при запуске: новая версия скачивается сама, затем приложение меняет свой файл и перезапускается. Активный прогон при этом не прерывается.',
     'Все данные остаются на компьютере: приложение не отправляет статистику и не требует аккаунта.',
   ],
   notesTitle: 'Важно знать',
@@ -227,8 +231,12 @@ const EN: Copy = {
   under: [
     'Process-only mode: only the .exe launch is emulated. RPC and console modes were removed to keep behaviour predictable.',
     'One game at a time: only a single process runs at once — Discord counts only one game anyway.',
+    'Games run in a random order: the next game is picked from the pool instead of the database order. Filters (history, 18+) are applied before shuffling, so the set stays the same.',
+    'History filtering is always on: a game that completed its hold never runs again, and the filter cannot be disabled. To run it again, return the game to the pool from “History”.',
+    'A minimised window does not stop the run: the hold and history continue in the background. When the window returns, the ring eases into the real remaining time (accurate to the millisecond) instead of replaying the missed seconds.',
     'After every game the process closes, a 20 second pause follows, and only then the next game starts. The pause is always on and is included in the total estimate.',
     'The Discord database is cached locally and refreshed on demand. History and cache live in %APPDATA%\\Ultra Mimic.',
+    'Updates are checked at launch: a newer build downloads itself, then the app swaps its own file and restarts. An active run is never interrupted.',
     'Everything stays on your PC: no statistics are sent and no account is required.',
   ],
   notesTitle: 'Good to know',
@@ -266,7 +274,7 @@ export const DocumentationView: React.FC = () => {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-lg font-semibold tracking-tight text-white">{c.title}</h2>
-              <Badge tone="accent">v2.0.0</Badge>
+              <Badge tone="accent">v2.2.2</Badge>
             </div>
             <p className="mt-1.5 max-w-3xl break-words text-[12px] leading-relaxed text-muted">{c.subtitle}</p>
             <div className="mt-2.5 flex flex-wrap gap-1.5">

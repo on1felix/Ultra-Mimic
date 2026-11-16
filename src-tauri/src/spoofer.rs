@@ -189,6 +189,29 @@ unsafe impl Send for JobObjectGuard {}
 #[cfg(windows)]
 unsafe impl Sync for JobObjectGuard {}
 
+/// Randomises the order once per run, so games are taken from the pool in an
+/// unpredictable order instead of the database order. History, 18+ and farm
+/// filters run before this, so the set itself stays exactly the same.
+fn shuffle_pool<T>(pool: &mut [T]) {
+    if pool.len() < 2 {
+        return;
+    }
+    let seed = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_nanos() as u64)
+        .unwrap_or(0)
+        ^ ((std::process::id() as u64) << 32);
+    // xorshift64: a fresh order every run without pulling in a rand crate.
+    let mut state = seed | 1;
+    for i in (1..pool.len()).rev() {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        let j = (state % (i as u64 + 1)) as usize;
+        pool.swap(i, j);
+    }
+}
+
 /// Picks the fixed farm set. Games sharing an exe name can't run side by side,
 /// so duplicates are dropped here instead of spilling into a second batch.
 fn select_farm_games(
@@ -278,7 +301,10 @@ pub async fn run_spoofer(
     let history = load_history();
     let mut pool: Vec<SpoofableGame> = if is_farm {
         select_farm_games(&app, mode_filtered_games, &config.farm_game_ids)
-    } else if config.skip_previously_spoofed {
+    } else {
+        // History is built in: a game that already reached the end of its hold
+        // never runs again, and there is no setting to turn this off. Only the
+        // hours farm above ignores it, because those games are picked by hand.
         let before_count = mode_filtered_games.len();
         let filtered: Vec<SpoofableGame> = mode_filtered_games
             .into_iter()
@@ -294,9 +320,21 @@ pub async fn run_spoofer(
             log_event(&app, "info", &message);
         }
         filtered
-    } else {
-        mode_filtered_games
     };
+
+    // Both modes now walk the pool in a random order. The preview in the UI
+    // reads the same pool, so it shows the games that will actually run next.
+    shuffle_pool(&mut pool);
+    if pool.len() > 1 {
+        log_event(
+            &app,
+            "info",
+            pick(
+                "Порядок игр случайный: следующая игра выбирается из пула.",
+                "Game order is random: the next game is picked from the pool.",
+            ),
+        );
+    }
 
     let total_available = pool.len();
     if total_available == 0 {
@@ -513,7 +551,11 @@ pub async fn run_spoofer(
                             phase: "cooldown".to_string(),
                             hold_total_secs: 0,
                             hold_remaining_secs: 0,
+                            hold_remaining_ms: 0,
                             cooldown_remaining_secs: left,
+                            cooldown_remaining_ms: cd_duration
+                                .saturating_sub(cd_start.elapsed())
+                                .as_millis() as u64,
                             next_batch: preview_games(&pool, QUEUE_PREVIEW),
                             pool_remaining: pool.len(),
                         },
@@ -751,6 +793,10 @@ pub async fn run_spoofer(
             Some(Duration::from_secs(config.hold_duration_secs.clamp(3, 3600)))
         };
 
+        // Start the hold clock before publishing the initial full-time tick, so
+        // the UI and backend use the same start instant for every batch.
+        let mut hold_start = Instant::now();
+
         // Emit spoofer tick event
         let elapsed_secs = start_time.elapsed().as_secs();
         let games_done = processed_count;
@@ -781,7 +827,9 @@ pub async fn run_spoofer(
                 phase: if is_farm { "farm" } else { "hold" }.to_string(),
                 hold_total_secs,
                 hold_remaining_secs: hold_total_secs,
+                hold_remaining_ms: hold_total_secs * 1000,
                 cooldown_remaining_secs: 0,
+                cooldown_remaining_ms: 0,
                 next_batch: if is_farm {
                     Vec::new()
                 } else {
@@ -819,14 +867,16 @@ pub async fn run_spoofer(
         };
         log_event(&app, "info", &batch_message);
 
-        // Hold processes and RPC sessions for the duration
-        let mut hold_start = Instant::now();
-        // Ticks are scheduled on an absolute grid (`start + 1 s`, `start + 2 s`, …)
-        // instead of "1 s after the previous tick". Resetting the timer on every
-        // iteration added ~50 ms of drift per tick, so the reported values fell
-        // behind the UI clock and the digits occasionally had to jump two
-        // seconds at once to catch up.
-        let mut next_tick = hold_start + Duration::from_secs(1);
+        // Hold processes and RPC sessions for the exact configured duration.
+        // Keep both reporting and polling on absolute deadlines. Sleeping 100 ms
+        // after each loop iteration adds the work done in that iteration to every
+        // interval; across a long hold that overhead accumulates and the run can
+        // finish late. Absolute poll deadlines avoid that cumulative drift, and
+        // the final wake is capped at the hold deadline itself.
+        let tick_interval = Duration::from_secs(1);
+        let poll_interval = Duration::from_millis(100);
+        let mut next_tick = hold_start + tick_interval;
+        let mut next_poll = hold_start + poll_interval;
         while hold_duration.map_or(true, |limit| hold_start.elapsed() < limit) {
             if cancel_flag.load(Ordering::SeqCst) {
                 break;
@@ -863,6 +913,8 @@ pub async fn run_spoofer(
                 let total = hold_duration.map(|d| d.as_secs()).unwrap_or(0);
                 let left = hold_duration
                     .map_or(0, |limit| seconds_left(limit, held));
+                let left_ms = hold_duration
+                    .map_or(0, |limit| limit.saturating_sub(held).as_millis() as u64);
                 let _ = app.emit(
                     "spoofer_tick",
                     SpooferTickEvent {
@@ -882,7 +934,9 @@ pub async fn run_spoofer(
                         phase: if is_farm { "farm" } else { "hold" }.to_string(),
                         hold_total_secs: total,
                         hold_remaining_secs: left,
+                        hold_remaining_ms: left_ms,
                         cooldown_remaining_secs: 0,
+                        cooldown_remaining_ms: 0,
                         next_batch: if is_farm {
                             Vec::new()
                         } else {
@@ -912,8 +966,10 @@ pub async fn run_spoofer(
                 if cancel_flag.load(Ordering::SeqCst) {
                     break;
                 }
-                hold_start += pause_start.elapsed();
-                next_tick += pause_start.elapsed();
+                let paused_for = pause_start.elapsed();
+                hold_start += paused_for;
+                next_tick += paused_for;
+                next_poll += paused_for;
                 *status_lock.write().await = SpooferStatus::Running;
                 let _ = app.emit(
                     "spoofer_status",
@@ -929,16 +985,81 @@ pub async fn run_spoofer(
             );
             }
 
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Sleep until the next absolute poll deadline instead of a fixed
+            // 100 ms: the loop's own work (process checks, tick emission) would
+            // otherwise stretch every interval and make the hold run longer.
+            // The final wake lands exactly on the hold deadline.
+            let hold_deadline = hold_duration.map(|limit| hold_start + limit);
+            let wake = match hold_deadline {
+                Some(end) => next_poll.min(end),
+                None => next_poll,
+            };
+            let now = Instant::now();
+            if wake > now {
+                tokio::time::sleep(wake - now).await;
+            }
+
+            next_poll += poll_interval;
+            let after = Instant::now();
+            if next_poll <= after {
+                next_poll = after + poll_interval;
+            }
         }
 
-        // Record the finished batch right away, before the cleanup and the
-        // breather: stopping the run at this point must not make the game look
-        // unplayed and launch it again next time. Farm games stay available for
-        // normal runs, and games that failed to start are retried next time.
-        if !is_farm && !cancel_flag.load(Ordering::SeqCst) {
+        // A hold counts only when it reached its deadline: a run stopped in the
+        // middle of the window must not mark the game as played.
+        let hold_completed = !cancel_flag.load(Ordering::SeqCst)
+            && hold_duration.is_some_and(|limit| hold_start.elapsed() >= limit);
+
+        // Report the final 00:00 and keep it on screen for a moment. The next
+        // tick (cooldown or the next batch) used to replace the countdown while
+        // it still read 00:01, so the ring never actually showed its zero.
+        if hold_completed {
+            if let Some(limit) = hold_duration {
+                let total = limit.as_secs();
+                let _ = app.emit(
+                    "spoofer_tick",
+                    SpooferTickEvent {
+                        current_index: processed_count,
+                        total_games: target_count,
+                        active_batch: active_batch_info.clone(),
+                        elapsed_secs: total,
+                        estimated_remaining_secs: if is_farm {
+                            0
+                        } else {
+                            session_estimate_secs(&config, target_count, batch_size)
+                                .saturating_sub(start_time.elapsed().as_secs())
+                        },
+                        games_per_minute: 0.0,
+                        succeeded_count,
+                        failed_count,
+                        phase: if is_farm { "farm" } else { "hold" }.to_string(),
+                        hold_total_secs: total,
+                        hold_remaining_secs: 0,
+                        hold_remaining_ms: 0,
+                        cooldown_remaining_secs: 0,
+                        cooldown_remaining_ms: 0,
+                        next_batch: if is_farm {
+                            Vec::new()
+                        } else {
+                            preview_games(&pool, QUEUE_PREVIEW)
+                        },
+                        pool_remaining: pool.len(),
+                    },
+                );
+            }
+        }
+
+        // Record the finished batch before the 00:00 frame is held: pressing
+        // stop during those 400 ms used to drop a game that had already been
+        // held for the full window, so it was launched again next time.
+        if hold_completed && !is_farm {
             let batch_ids: Vec<String> = active_batch_info.iter().map(|g| g.id.clone()).collect();
             record_played_batch(&batch_ids);
+        }
+
+        if hold_completed && hold_duration.is_some() {
+            tokio::time::sleep(Duration::from_millis(400)).await;
         }
 
         // Cleanup spawned child processes and temporary files
@@ -1030,7 +1151,9 @@ pub async fn run_spoofer(
                 phase: gap_phase.to_string(),
                 hold_total_secs: gap_hold_total,
                 hold_remaining_secs: gap_hold_remaining,
+                hold_remaining_ms: gap_hold_remaining * 1000,
                 cooldown_remaining_secs: gap_cooldown_remaining,
+                cooldown_remaining_ms: gap_cooldown_remaining * 1000,
                 next_batch: if has_next_batch {
                     preview_games(&pool, QUEUE_PREVIEW)
                 } else {
@@ -1072,9 +1195,21 @@ pub async fn run_spoofer(
         log_event(&app, "info", &message);
     } else if final_status == SpooferStatus::Finished {
         let message = if is_russian() {
+            if failed_count > 0 {
+                format!(
+                    "Эмуляция завершена: {} игр за {} сек, {} не удалось запустить — они не записаны в историю и будут запущены снова. Успешно: {}.",
+                    processed_count, total_elapsed, failed_count, succeeded_count
+                )
+            } else {
+                format!(
+                    "Эмуляция {} игр успешно завершена за {} сек! Прогресс сохранен в истории.",
+                    processed_count, total_elapsed
+                )
+            }
+        } else if failed_count > 0 {
             format!(
-                "Эмуляция {} игр успешно завершена за {} сек! Прогресс сохранен в истории.",
-                processed_count, total_elapsed
+                "Finished: {} games in {} sec, {} failed to launch — they were not added to history and will be retried. Succeeded: {}.",
+                processed_count, total_elapsed, failed_count, succeeded_count
             )
         } else {
             format!(
@@ -1096,5 +1231,34 @@ pub async fn run_spoofer(
             )
         };
         log_event(&app, "info", &message);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn shuffle_keeps_every_game_exactly_once() {
+        let mut pool: Vec<u32> = (0..500).collect();
+        shuffle_pool(&mut pool);
+        assert_eq!(pool.len(), 500);
+
+        let mut sorted = pool.clone();
+        sorted.sort_unstable();
+        assert_eq!(sorted, (0..500).collect::<Vec<u32>>());
+        // Order must actually change: 1 in 500! chance of a false failure.
+        assert_ne!(pool, (0..500).collect::<Vec<u32>>());
+    }
+
+    #[test]
+    fn shuffle_leaves_empty_and_single_pools_untouched() {
+        let mut empty: Vec<u32> = Vec::new();
+        shuffle_pool(&mut empty);
+        assert!(empty.is_empty());
+
+        let mut single = vec![42u32];
+        shuffle_pool(&mut single);
+        assert_eq!(single, vec![42]);
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "ultra-mimic"
-version = "2.0.0"
+version = "2.2.2"
 description = "Ultra Mimic — Discord activity emulator"
 authors = ["Ultra Mimic"]
 license = "GPL-3.0-or-later"
@@ -19,6 +19,7 @@ tauri-plugin-single-instance = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "gzip"] }
+sha2 = "0.10"
 tokio = { version = "1", features = ["full"] }
 
 [target.'cfg(windows)'.dependencies]

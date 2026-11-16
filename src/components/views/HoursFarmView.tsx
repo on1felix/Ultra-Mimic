@@ -131,7 +131,7 @@ export const HoursFarmView: React.FC<HoursFarmViewProps> = ({
           </div>
 
           <div className="mt-4 space-y-2">
-            <Progress value={livePct} active={status === 'running'} tone="amber" />
+            <Progress value={livePct} active={status === 'running'} tone="accent" />
             <div className="flex flex-wrap gap-2">
               {tick.active_batch.map((game) => (
                 <span

@@ -13,6 +13,7 @@ import type {
   HistoryGame,
   StorageInfo,
 } from '@/types/spoofer';
+import type { UpdateInfo, UpdateProgress } from '@/types/update';
 
 export const isTauriRuntime = (): boolean =>
   typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -131,6 +132,24 @@ export const tauriApi = {
     window.open(url, '_blank', 'noopener,noreferrer');
   },
 
+  // Auto-update: latest GitHub release, download and silent restart
+  checkUpdate: (): Promise<UpdateInfo | null> => {
+    if (!isTauriRuntime()) return Promise.resolve(null);
+    return invoke('check_update');
+  },
+
+  downloadUpdate: (
+    url: string,
+    sha256?: string | null,
+    size?: number | null
+  ): Promise<string> => {
+    return invoke('download_update', { url, sha256: sha256 ?? null, size: size ?? 0 });
+  },
+
+  applyUpdate: (): Promise<void> => {
+    return invoke('apply_update');
+  },
+
   // Event Listeners
   onTick: (cb: (payload: SpooferTickEvent) => void): Promise<UnlistenFn> => {
     return listen<SpooferTickEvent>('spoofer_tick', (e) => cb(e.payload));
@@ -147,5 +166,9 @@ export const tauriApi = {
 
   onFetchProgress: (cb: (payload: FetchProgressEvent) => void): Promise<UnlistenFn> => {
     return listen<FetchProgressEvent>('fetch_progress', (e) => cb(e.payload));
+  },
+
+  onUpdateProgress: (cb: (payload: UpdateProgress) => void): Promise<UnlistenFn> => {
+    return listen<UpdateProgress>('update-progress', (e) => cb(e.payload));
   },
 };
